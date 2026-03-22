@@ -29,7 +29,7 @@ Jusqu'ici nous avons travaillé avec des données **vectorielles** : des points,
 C'est là qu'intervient le **raster**.
 
 |   | Vecteur | Raster |
-|------------------------|------------------------|------------------------|
+|----|----|----|
 | **Structure** | Points, lignes, polygones | Grille régulière de pixels |
 | **Adapté pour** | Entités discrètes (communes, routes) | Phénomènes continus (altitude, T°) |
 | **Format de fichier** | `.shp`, `.gpkg`, `.geojson` | `.tif`, `.img`, `.nc` |
@@ -301,7 +301,7 @@ Reprojeter un raster = **réinterpoler** les valeurs de chaque cellule dans une 
 ## Règle pratique
 
 | Situation | Package recommandé |
-|---------------------------|---------------------------------------------|
+|----|----|
 | Modèle numérique de terrain (MNT) | `terra` |
 | Calculs raster rapides (reclassification, algèbre) | `terra` |
 | Image satellitaire multibande | `stars` ou `terra` |

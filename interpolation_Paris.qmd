@@ -22,11 +22,10 @@ execute:
   echo: true
 ---
 
-::: {.callout-important}
+::: callout-important
 ## Corrigé — à consulter après avoir essayé par vous-mêmes
 
-Ce document contient les réponses à l'exercice Paris posé dans
-[Lissage et Interpolation Spatiale](interpolation.qmd).
+Ce document contient les réponses à l'exercice Paris posé dans [Lissage et Interpolation Spatiale](interpolation.qmd).
 :::
 
 ```{r}
@@ -41,7 +40,7 @@ library(scales)
 library(patchwork)
 ```
 
----
+------------------------------------------------------------------------
 
 ## Partie A — IDW sur le prix Airbnb {#sec-idw}
 
@@ -136,16 +135,16 @@ ggplot() +
   )
 ```
 
-::: {.callout-tip}
+::: callout-tip
 ## Effet des paramètres
 
-- **`nmax` petit** (ex. 10) → surface très localisée, forte influence des points isolés
-- **`nmax` grand** (ex. 100) → surface plus lisse, influence étendue
-- **`idp` grand** (ex. 4) → décroissance rapide, les points lointains n'influencent presque pas
-- **`cellsize` petite** (ex. 100 m) → image plus fine mais calcul plus lent
+-   **`nmax` petit** (ex. 10) → surface très localisée, forte influence des points isolés
+-   **`nmax` grand** (ex. 100) → surface plus lisse, influence étendue
+-   **`idp` grand** (ex. 4) → décroissance rapide, les points lointains n'influencent presque pas
+-   **`cellsize` petite** (ex. 100 m) → image plus fine mais calcul plus lent
 :::
 
----
+------------------------------------------------------------------------
 
 ## Partie B — Heatmap de densité Airbnb {#sec-heatmap}
 
@@ -185,7 +184,7 @@ ggplot() +
   )
 ```
 
-### Comparaison : toutes annonces vs annonces > 150 €/nuit
+### Comparaison : toutes annonces vs annonces \> 150 €/nuit
 
 ```{r}
 #| label: fig-heatmap-compare
@@ -236,21 +235,21 @@ p1 + p2 +
   )
 ```
 
----
+------------------------------------------------------------------------
 
 ## IDW vs Heatmap — quelle méthode pour quelle question ? {#sec-compare}
 
-| | IDW | Heatmap |
-|--|-----|---------|
+|   | IDW | Heatmap |
+|----|----|----|
 | **Question** | Quel prix prédit-on ici ? | Combien d'annonces ici ? |
 | **Variable** | Prix (attribut des points) | Présence des points uniquement |
 | **Résultat** | Surface de valeurs continues | Surface de densité |
 | **Usage** | Estimer une variable manquante | Identifier des zones de concentration |
 
----
+------------------------------------------------------------------------
 
 > **← Retour au cours : [Lissage et Interpolation](interpolation.qmd)**
 
----
+------------------------------------------------------------------------
 
-*Dr. Elisabetta Pietrostefani — Directrice Adjointe, Geographic Data Science Lab — Université de Liverpool | Co-Directrice, [Imago : Data Service for Imagery](https://imago.ac.uk/) | Chercheuse Associée, London School of Economics*
+*Dr. Elisabetta Pietrostefani — Directrice Adjointe, Geographic Data Science Lab — Université de Liverpool \| Co-Directrice, [Imago : Data Service for Imagery](https://imago.ac.uk/) \| Chercheuse Associée, London School of Economics*

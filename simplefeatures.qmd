@@ -106,14 +106,12 @@ Modifiez la carte ci-dessus pour ajouter votre propre ville. Trouvez les coordon
 
 ## Représenter des données spatiales dans R {#sec-represent}
 
-Les trois types d'objets spatiaux fondamentaux sont les **points**, les **polygones** 
-et les **rasters**. Voyons chacun avec un exemple concret, en utilisant `ggplot2` 
-— la même syntaxe que vous utiliserez tout au long du cours.
+Les trois types d'objets spatiaux fondamentaux sont les **points**, les **polygones** et les **rasters**. Voyons chacun avec un exemple concret, en utilisant `ggplot2` — la même syntaxe que vous utiliserez tout au long du cours.
 
 ### 1. Points — des lieux précis
 
-Un point est défini par une paire de coordonnées (longitude, latitude). C'est la 
-représentation la plus simple : une ville, une station de mesure, une adresse.
+Un point est défini par une paire de coordonnées (longitude, latitude). C'est la représentation la plus simple : une ville, une station de mesure, une adresse.
+
 ```{r}
 #| label: fig-points
 #| fig-cap: "Points : cinq capitales européennes"
@@ -141,18 +139,16 @@ ggplot() +
   theme(plot.title = element_text(face = "bold", hjust = 0.5))
 ```
 
-::: {.callout-note}
+::: callout-note
 ## Exercice 2
 
-Ajoutez une ville de votre choix au data frame `cities`. 
-Trouvez ses coordonnées sur [latlong.net](https://www.latlong.net/).
+Ajoutez une ville de votre choix au data frame `cities`. Trouvez ses coordonnées sur [latlong.net](https://www.latlong.net/).
 :::
 
 ### 2. Polygones — des surfaces
 
-Un polygone est une séquence de points formant une surface fermée : commune, 
-département, région, pays. Les polygones portent une **table attributaire** — 
-c'est ce qui permet de les colorer selon une variable.
+Un polygone est une séquence de points formant une surface fermée : commune, département, région, pays. Les polygones portent une **table attributaire** — c'est ce qui permet de les colorer selon une variable.
+
 ```{r}
 #| label: fig-polygons
 #| fig-cap: "Polygones : PIB par habitant par pays en Europe"
@@ -182,13 +178,10 @@ ggplot(europe) +
 
 ### 3. Raster — des grilles de valeurs
 
-Un raster divise l'espace en une grille régulière de pixels, chacun portant 
-une valeur numérique. C'est le format naturel pour les **phénomènes continus** 
-comme l'altitude, la température ou l'occupation du sol.
+Un raster divise l'espace en une grille régulière de pixels, chacun portant une valeur numérique. C'est le format naturel pour les **phénomènes continus** comme l'altitude, la température ou l'occupation du sol.
 
-Le jeu de données `volcano` intégré à R représente le **Maungawhau** — un volcan 
-éteint situé à Auckland, Nouvelle-Zélande — sous forme d'une matrice 
-d'altitudes de 87 × 61 cellules.
+Le jeu de données `volcano` intégré à R représente le **Maungawhau** — un volcan éteint situé à Auckland, Nouvelle-Zélande — sous forme d'une matrice d'altitudes de 87 × 61 cellules.
+
 ```{r}
 #| label: fig-raster
 #| fig-cap: "Raster : Modèle Numérique d'Élévation du volcan Maungawhau, Auckland (NZ)"
@@ -218,6 +211,7 @@ ggplot(volcano_df, aes(x = x, y = y, fill = altitude)) +
     plot.subtitle = element_text(color = "grey40", hjust = 0.5)
   )
 ```
+
 ------------------------------------------------------------------------
 
 ## Simple Features (`sf`) {#sec-sf}
@@ -249,7 +243,7 @@ par(old_par)
 **Syntaxe WKT (*Well-Known Text*) :**
 
 | Type | Exemple WKT |
-|-----------------------|-------------------------------------------------|
+|----|----|
 | Point | `POINT (5 2)` |
 | Ligne | `LINESTRING (1 5, 4 4, 4 1, 2 2, 3 2)` |
 | Polygone | `POLYGON ((1 5, 2 2, 4 1, 4 4, 1 5))` |
@@ -435,7 +429,7 @@ head(districts |> st_drop_geometry() |> select(DIST_NAME, Level4, Population1674
 ## Les types de jointure en `dplyr`
 
 | Fonction           | Résultat                                             |
-|--------------------------------------|----------------------------------|
+|--------------------|------------------------------------------------------|
 | `left_join(x, y)`  | Toutes les lignes de x, colonnes de x et y           |
 | `inner_join(x, y)` | Seulement les lignes avec correspondance dans x et y |
 | `right_join(x, y)` | Toutes les lignes de y, colonnes de x et y           |
@@ -509,15 +503,15 @@ ggplot(districts,
 ::: callout-note
 ## Exercice 5
 
-**À vous de jouer !** Créez une carte similaire pour Paris avec des données de votre choix. Étapes : 
+**À vous de jouer !** Créez une carte similaire pour Paris avec des données de votre choix. Étapes :
 
-1. Charger un shapefile des arrondissements ou communes de Paris 
+1.  Charger un shapefile des arrondissements ou communes de Paris
 
-2. Charger un fichier CSV avec une variable socio-économique (INSEE) 
+2.  Charger un fichier CSV avec une variable socio-économique (INSEE)
 
-3. Faire la jointure avec `left_join()` 
+3.  Faire la jointure avec `left_join()`
 
-4. Créer la carte avec `ggplot2 + geom_sf()`
+4.  Créer la carte avec `ggplot2 + geom_sf()`
 :::
 
 ------------------------------------------------------------------------

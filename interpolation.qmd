@@ -24,12 +24,10 @@ execute:
 
 ## Introduction {#sec-intro}
 
-Les données spatiales sont rarement complètes — on observe un phénomène en un
-nombre limité d'endroits, et on cherche à l'estimer **partout**. Ce chapitre
-couvre deux approches complémentaires :
+Les données spatiales sont rarement complètes — on observe un phénomène en un nombre limité d'endroits, et on cherche à l'estimer **partout**. Ce chapitre couvre deux approches complémentaires :
 
 | Méthode | Question posée | Usage typique |
-|---------|---------------|---------------|
+|----|----|----|
 | **IDW** — Pondération Inverse à la Distance | Quelle valeur prédit-on en ce point ? | Prix immobiliers, pollution, température |
 | **Carte de chaleur** (*heatmap*) | Où les points sont-ils concentrés ? | Densité d'annonces, accidents, commerces |
 
@@ -44,20 +42,19 @@ library(dplyr)
 library(scales)
 ```
 
----
+------------------------------------------------------------------------
 
 ## Partie 1 — Interpolation IDW {#sec-idw}
 
 ### Le principe
 
-L'IDW prédit la valeur en tout point comme une moyenne pondérée des observations
-voisines, où le poids décroît avec la distance :
+L'IDW prédit la valeur en tout point comme une moyenne pondérée des observations voisines, où le poids décroît avec la distance :
 
 $$\hat{Z}(s_0) = \frac{\sum_{j=1}^{N} w_j \cdot Z(s_j)}{\sum_{j=1}^{N} w_j}
 \quad \text{avec} \quad w_j = \frac{1}{d(s_0,\, s_j)^p}$$
 
-- $p$ = puissance — plus elle est grande, plus les points lointains sont ignorés
-- $N$ = nombre de voisins pris en compte
+-   $p$ = puissance — plus elle est grande, plus les points lointains sont ignorés
+-   $N$ = nombre de voisins pris en compte
 
 ### Charger les données
 
@@ -141,14 +138,14 @@ ggplot() +
   )
 ```
 
-::: {.callout-note}
+::: callout-note
 ## Exercice 1 — Faire varier les paramètres
 
-| Paramètre | Valeur actuelle | À tester |
-|-----------|----------------|---------|
-| `nmax` (N voisins) | 50 | 10, 100 |
-| `idp` (puissance) | 2 | 1, 4 |
-| `cellsize` (résolution) | 500 m | 250 m, 1000 m |
+| Paramètre               | Valeur actuelle | À tester      |
+|-------------------------|-----------------|---------------|
+| `nmax` (N voisins)      | 50              | 10, 100       |
+| `idp` (puissance)       | 2               | 1, 4          |
+| `cellsize` (résolution) | 500 m           | 250 m, 1000 m |
 
 ```{r}
 #| eval: false
@@ -173,17 +170,13 @@ ggplot() +
 ```
 :::
 
----
+------------------------------------------------------------------------
 
 ## Partie 2 — Carte de chaleur (*heatmap*) {#sec-heatmap}
 
-Une heatmap répond à une question différente de l'IDW : non pas *quelle valeur*
-en un point, mais *combien de points* se concentrent autour. Elle est idéale pour
-visualiser la **densité spatiale** d'un phénomène.
+Une heatmap répond à une question différente de l'IDW : non pas *quelle valeur* en un point, mais *combien de points* se concentrent autour. Elle est idéale pour visualiser la **densité spatiale** d'un phénomène.
 
-`stat_density_2d()` de `ggplot2` calcule une estimation de densité par noyau
-gaussien bidimensionnel directement sur les coordonnées — aucun package
-supplémentaire nécessaire.
+`stat_density_2d()` de `ggplot2` calcule une estimation de densité par noyau gaussien bidimensionnel directement sur les coordonnées — aucun package supplémentaire nécessaire.
 
 ```{r}
 #| label: fig-heatmap-london
@@ -219,11 +212,10 @@ ggplot() +
   )
 ```
 
-::: {.callout-note}
+::: callout-note
 ## Exercice 2 — Heatmap des transactions les plus chères
 
-Filtrez les transactions au-dessus de 500 000 £ et produisez une heatmap pour
-visualiser où se concentrent les biens les plus chers.
+Filtrez les transactions au-dessus de 500 000 £ et produisez une heatmap pour visualiser où se concentrent les biens les plus chers.
 
 ```{r}
 #| eval: false
@@ -250,39 +242,39 @@ ggplot() +
 ```
 :::
 
----
+------------------------------------------------------------------------
 
 ## Exercice — Reproduire sur Paris Airbnb {#sec-exercise}
 
-::: {.callout-note}
+::: callout-note
 ## À vous de jouer !
 
 Reproduisez les deux analyses avec les données Airbnb de Paris :
 
 **Partie A — IDW sur le prix**
 
-1. Chargez `arrondiss_lambert.shp` et `listings.csv`
-2. Spatialisez les annonces (colonnes 8 et 7), reprojetez en Lambert-93
-3. Filtrez à moins de 200 €/nuit
-4. Appliquez l'IDW et cartographiez le prix interpolé
+1.  Chargez `arrondiss_lambert.shp` et `listings.csv`
+2.  Spatialisez les annonces (colonnes 8 et 7), reprojetez en Lambert-93
+3.  Filtrez à moins de 200 €/nuit
+4.  Appliquez l'IDW et cartographiez le prix interpolé
 
 **Partie B — Heatmap de densité**
 
-1. Extrayez les coordonnées des annonces filtrées avec `st_coordinates()`
-2. Appliquez `stat_density_2d()` sur fond sombre
-3. Comparez la densité globale avec celle des annonces > 150 €/nuit
+1.  Extrayez les coordonnées des annonces filtrées avec `st_coordinates()`
+2.  Appliquez `stat_density_2d()` sur fond sombre
+3.  Comparez la densité globale avec celle des annonces \> 150 €/nuit
 
 **→ Corrigé : [Interpolation Paris](interpolation_Paris.qmd)**
 :::
 
----
+------------------------------------------------------------------------
 
 ## Récapitulatif {#sec-summary}
 
-::: {.callout-note}
+::: callout-note
 ## Fonctions clés
 
-```r
+``` r
 # IDW
 gs     <- gstat(formula = var ~ 1, data = sf::as_Spatial(pts_sf),
                 nmax = 50, set = list(idp = 2))
@@ -299,19 +291,18 @@ ggplot() +
 ```
 :::
 
----
+------------------------------------------------------------------------
 
 ## Liens utiles {#sec-links}
 
-- [gstat documentation](https://r-spatial.github.io/gstat/)
-- [IDW explained](https://gisgeography.com/inverse-distance-weighting-idw-interpolation/)
-- [Geocomputation with R — Interpolation](https://geocompr.robinlovelace.net/spatial-cv.html)
+-   [gstat documentation](https://r-spatial.github.io/gstat/)
+-   [IDW explained](https://gisgeography.com/inverse-distance-weighting-idw-interpolation/)
+-   [Geocomputation with R — Interpolation](https://geocompr.robinlovelace.net/spatial-cv.html)
 
----
+------------------------------------------------------------------------
 
-> **← Précédent : [Indices Topographiques](indices_topo.qmd)**
-> **→ Suivant : Réponses**
+> **← Précédent : [Indices Topographiques](indices_topo.qmd)** **→ Suivant : Réponses**
 
----
+------------------------------------------------------------------------
 
-*Dr. Elisabetta Pietrostefani — Directrice Adjointe, Geographic Data Science Lab — Université de Liverpool | Co-Directrice, [Imago : Data Service for Imagery](https://imago.ac.uk/) | Chercheuse Associée, London School of Economics*
+*Dr. Elisabetta Pietrostefani — Directrice Adjointe, Geographic Data Science Lab — Université de Liverpool \| Co-Directrice, [Imago : Data Service for Imagery](https://imago.ac.uk/) \| Chercheuse Associée, London School of Economics*

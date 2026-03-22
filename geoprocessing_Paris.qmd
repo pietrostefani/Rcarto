@@ -654,7 +654,7 @@ Documentation complète : [ggplot2.tidyverse.org/reference/ggsave](https://ggplo
 ## Ce que vous avez pratiqué
 
 | Opération | Fonction | Données |
-|--------------------------|------------------------|----------------------|
+|----|----|----|
 | Charger shapefile | `read_sf()` | Arrondissements, IRIS |
 | Reprojeter | `st_transform(x, 2154)` | Lambert-93 France |
 | Jointure attributaire | `left_join()` | Données socio-économiques |
