@@ -1,0 +1,405 @@
+---
+title: "4.1 — Densité et Évolution de la Population"
+subtitle: "R pour la Cartographie et les SIG"
+author: "Dr. Elisabetta Pietrostefani"
+date: today
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    toc-title: "Table des matières"
+    number-sections: true
+    code-fold: show
+    code-tools: true
+    theme: cosmo
+    highlight-style: github
+    embed-resources: true
+    fig-align: center
+    fig-width: 8
+    fig-height: 7
+execute:
+  warning: false
+  message: false
+  echo: true
+---
+
+## Introduction {#sec-intro}
+
+Ce chapitre combine les compétences acquises dans les chapitres précédents — 
+manipulation raster, recadrage, statistiques zonales — pour répondre à une 
+question concrète : **où la population a-t-elle augmenté ou diminué entre 2010 
+et 2020 ?**
+
+Nous utilisons les données **GPW** (*Gridded Population of the World*) de 
+l'Université de Columbia, qui fournissent des estimations de population sur une 
+grille régulière de 2,5 minutes d'arc (~5 km) pour le monde entier.
+
+**Données utilisées :**
+
+| Fichier | Description |
+|---------|-------------|
+| `gpw_v4_..._2010_2pt5_min.tif` | Population GPW 2010 |
+| `gpw_v4_..._2020_2pt5_min.tif` | Population GPW 2020 |
+| `gadm41_GBR_2.shp` | Comtés du Royaume-Uni (GADM niveau 2) |
+
+::: {.callout-note collapse="true"}
+## Télécharger les données GPW
+
+Les données GPW v4 sont disponibles gratuitement sur :  
+[sedac.ciesin.columbia.edu/data/collection/gpw-v4](https://sedac.ciesin.columbia.edu/data/collection/gpw-v4)
+
+Les limites administratives GADM sont disponibles sur :  
+[gadm.org/download_country.html](https://gadm.org/download_country.html)
+:::
+
+```{r}
+#| label: setup
+#| message: false
+
+library(terra)          # manipulation raster
+library(sf)             # données vectorielles
+library(exactextractr)  # extraction raster → polygones (rapide et précis)
+library(ggplot2)        # visualisation
+library(dplyr)          # manipulation de données
+library(tidyterra)      # geom_spatraster()
+library(classInt)       # classification
+library(scales)         # formatage axes
+library(patchwork)      # assembler plusieurs graphiques
+```
+
+::: {.callout-note collapse="true"}
+## Installer les packages si nécessaire
+
+```{r}
+#| eval: false
+install.packages(c("exactextractr", "tidyterra", "patchwork"))
+```
+
+`exactextractr` est nettement plus rapide que `terra::extract()` pour les 
+statistiques zonales sur de nombreux polygones — il gère correctement les 
+cellules partiellement couvertes par les polygones.
+:::
+
+---
+
+## Étape 1 — Charger et recadrer les rasters {#sec-load}
+
+```{r}
+#| label: load-rasters
+
+# Rasters GPW — population totale par cellule
+pop_2010 <- rast("data/UK/gpw_v4_population_count_rev11_2010_2pt5_min.tif")
+pop_2020 <- rast("data/UK/gpw_v4_population_count_rev11_2020_2pt5_min.tif")
+
+# Limites administratives — Royaume-Uni (GADM niveau 2 : comtés)
+uk <- read_sf("data/UK/gadm41_GBR_2.shp")
+
+cat("SCR raster :", crs(pop_2010, describe = TRUE)$name, "\n")
+cat("SCR vecteur:", st_crs(uk)$srid, "\n")
+cat("Résolution :", res(pop_2010), "degrés (~5 km)\n")
+```
+
+```{r}
+#| label: crop-mask
+
+# Recadrer et masquer sur le Royaume-Uni
+pop_2010_uk <- crop(pop_2010, uk) |> mask(uk)
+pop_2020_uk <- crop(pop_2020, uk) |> mask(uk)
+
+# Reprojeter en British National Grid (mètres) pour les calculs de superficie
+uk_bng         <- st_transform(uk, 27700)
+pop_2010_bng   <- terra::project(pop_2010_uk, "EPSG:27700")
+pop_2020_bng   <- terra::project(pop_2020_uk, "EPSG:27700")
+
+cat("Population totale 2010 :",
+    format(round(global(pop_2010_uk, "sum", na.rm = TRUE)[[1]]), big.mark = " "), "\n")
+cat("Population totale 2020 :",
+    format(round(global(pop_2020_uk, "sum", na.rm = TRUE)[[1]]), big.mark = " "), "\n")
+```
+
+---
+
+## Étape 2 — Visualiser les rasters bruts {#sec-viz-raster}
+
+```{r}
+#| label: fig-rasters-uk
+#| fig-cap: "Population totale par cellule — Royaume-Uni 2010 et 2020"
+#| fig-height: 7
+
+# Échelle logarithmique pour mieux voir la distribution
+pop_2010_log <- log1p(pop_2010_uk)
+pop_2020_log <- log1p(pop_2020_uk)
+
+p1 <- ggplot() +
+  geom_spatraster(data = pop_2010_log) +
+  scale_fill_viridis_c(
+    option   = "inferno",
+    name     = "log(pop + 1)",
+    na.value = "transparent"
+  ) +
+  geom_sf(data = uk, fill = NA, color = "white", linewidth = 0.1) +
+  labs(title = "2010", caption = "Source : GPW v4 | Cours R-Carto") +
+  theme_void(base_size = 11) +
+  theme(plot.title = element_text(face = "bold", hjust = 0.5),
+        legend.key.height = unit(1.2, "cm"))
+
+p2 <- ggplot() +
+  geom_spatraster(data = pop_2020_log) +
+  scale_fill_viridis_c(
+    option   = "inferno",
+    name     = "log(pop + 1)",
+    na.value = "transparent"
+  ) +
+  geom_sf(data = uk, fill = NA, color = "white", linewidth = 0.1) +
+  labs(title = "2020", caption = "Source : GPW v4 | Cours R-Carto") +
+  theme_void(base_size = 11) +
+  theme(plot.title = element_text(face = "bold", hjust = 0.5),
+        legend.key.height = unit(1.2, "cm"))
+
+p1 + p2 +
+  plot_annotation(
+    title    = "Population du Royaume-Uni — GPW v4",
+    subtitle = "Échelle logarithmique pour mieux visualiser les gradients",
+    theme    = theme(
+      plot.title    = element_text(face = "bold", hjust = 0.5, size = 14),
+      plot.subtitle = element_text(color = "grey40", hjust = 0.5)
+    )
+  )
+```
+
+---
+
+## Étape 3 — Statistiques zonales : densité de population {#sec-zonal}
+
+On extrait la **somme de population** par comté, puis on calcule la **densité** 
+en divisant par la superficie.
+
+```{r}
+#| label: zonal-stats
+
+# Superficie de chaque comté en km²
+uk_bng$area_km2 <- as.numeric(st_area(uk_bng)) / 1e6
+
+# Extraire la population totale par comté (exactextractr)
+uk_bng$pop_2010 <- exact_extract(pop_2010_bng, uk_bng, "sum", progress = FALSE)
+uk_bng$pop_2020 <- exact_extract(pop_2020_bng, uk_bng, "sum", progress = FALSE)
+
+# Calculer les densités
+uk_bng <- uk_bng |>
+  mutate(
+    density_2010 = pop_2010 / area_km2,
+    density_2020 = pop_2020 / area_km2
+  )
+
+# Aperçu
+uk_bng |> st_drop_geometry() |>
+  select(NAME_2, area_km2, pop_2010, density_2010) |>
+  arrange(desc(density_2010)) |>
+  head(8) |>
+  mutate(across(where(is.numeric), ~ round(.x, 1))) |>
+  knitr::kable(caption = "Comtés les plus denses — Royaume-Uni 2010")
+```
+
+---
+
+## Étape 4 — Carte de densité {#sec-density-map}
+
+```{r}
+#| label: fig-density
+#| fig-cap: "Densité de population par comté — Royaume-Uni 2010 et 2020"
+#| fig-height: 8
+
+# Classification Jenks pour les deux années sur la même échelle
+dens_vec <- uk_bng |> st_drop_geometry() |>
+  pull(density_2010) |> na.omit()
+breaks_j <- classIntervals(dens_vec, n = 6, style = "jenks")$brks
+
+clean_labels <- function(x) {
+  levels(x) <- gsub("\\(|\\[|\\]|\\)", "", levels(x)) |>
+    gsub(",", " – ", x = _)
+  x
+}
+
+uk_bng <- uk_bng |>
+  mutate(
+    cls_2010 = cut(density_2010, breaks = breaks_j,
+                   include.lowest = TRUE, dig.lab = 0,
+                   ordered_result = TRUE) |> clean_labels(),
+    cls_2020 = cut(density_2020, breaks = breaks_j,
+                   include.lowest = TRUE, dig.lab = 0,
+                   ordered_result = TRUE) |> clean_labels()
+  )
+
+map_2010 <- ggplot(uk_bng) +
+  geom_sf(aes(fill = cls_2010), color = "white", linewidth = 0.15) +
+  scale_fill_brewer(palette = "YlOrRd", name = "hab/km²", na.value = "grey80") +
+  labs(title = "2010") +
+  theme_void(base_size = 11) +
+  theme(plot.title = element_text(face = "bold", hjust = 0.5))
+
+map_2020 <- ggplot(uk_bng) +
+  geom_sf(aes(fill = cls_2020), color = "white", linewidth = 0.15) +
+  scale_fill_brewer(palette = "YlOrRd", name = "hab/km²", na.value = "grey80") +
+  labs(title = "2020") +
+  theme_void(base_size = 11) +
+  theme(plot.title = element_text(face = "bold", hjust = 0.5))
+
+map_2010 + map_2020 +
+  plot_annotation(
+    title   = "Densité de population — Royaume-Uni",
+    caption = "Source : GPW v4 / GADM | Cours R-Carto",
+    theme   = theme(
+      plot.title   = element_text(face = "bold", hjust = 0.5, size = 14),
+      plot.caption = element_text(color = "grey55", hjust = 0)
+    )
+  )
+```
+
+---
+
+## Étape 5 — Évolution de la population 2010–2020 {#sec-change}
+
+On calcule le **changement en pourcentage** cellule par cellule avec l'algèbre 
+raster, puis on l'agrège par comté.
+
+```{r}
+#| label: pop-change-raster
+
+# Changement en % : (2020 - 2010) / 2010 * 100
+pop_change <- (pop_2020_bng - pop_2010_bng) / pop_2010_bng * 100
+
+# Limiter les valeurs extrêmes pour la visualisation
+pop_change_clip <- clamp(pop_change, lower = -50, upper = 100, values = FALSE)
+```
+
+```{r}
+#| label: fig-pop-change-raster
+#| fig-cap: "Évolution de la population 2010–2020 — cellule par cellule (raster)"
+
+ggplot() +
+  geom_spatraster(data = pop_change_clip) +
+  scale_fill_distiller(
+    palette   = "RdBu",
+    direction = 1,
+    name      = "Variation (%)",
+    limits    = c(-50, 100),
+    na.value  = "transparent",
+    guide     = guide_colorbar(barheight = unit(5, "cm"))
+  ) +
+  geom_sf(data = uk_bng, fill = NA, color = "white", linewidth = 0.15) +
+  labs(
+    title    = "Évolution de la population — Royaume-Uni 2010–2020",
+    subtitle = "Rouge = déclin | Bleu = croissance",
+    caption  = "Source : GPW v4 | Cours R-Carto"
+  ) +
+  theme_void(base_size = 12) +
+  theme(
+    plot.title    = element_text(face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(color = "grey40", hjust = 0.5)
+  )
+```
+
+```{r}
+#| label: change-by-county
+
+# Changement agrégé par comté
+uk_bng$pop_change_pct <- ((uk_bng$pop_2020 - uk_bng$pop_2010) /
+                            uk_bng$pop_2010) * 100
+```
+
+```{r}
+#| label: fig-pop-change-map
+#| fig-cap: "Évolution de la population par comté — Royaume-Uni 2010–2020"
+
+ggplot(uk_bng) +
+  geom_sf(aes(fill = pop_change_pct), color = "white", linewidth = 0.15) +
+  scale_fill_distiller(
+    palette   = "RdBu",
+    direction = 1,
+    name      = "Variation (%)",
+    limits    = c(-15, 15),
+    oob       = squish,
+    na.value  = "grey80",
+    guide     = guide_colorbar(barheight = unit(5, "cm"))
+  ) +
+  labs(
+    title    = "Évolution de la population par comté",
+    subtitle = "Royaume-Uni 2010–2020 | Rouge = déclin | Bleu = croissance",
+    caption  = "Source : GPW v4 / GADM | Cours R-Carto"
+  ) +
+  theme_void(base_size = 12) +
+  theme(
+    plot.title    = element_text(face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(color = "grey40", hjust = 0.5)
+  )
+```
+
+---
+
+## Récapitulatif de la chaîne d'analyse {#sec-summary}
+
+::: {.callout-note}
+## Les étapes clés
+
+```r
+# 1. Charger et recadrer
+pop <- rast("gpw_2010.tif")
+ukv <- read_sf("gadm_uk.shp")
+pop_uk <- crop(pop, ukv) |> mask(ukv)
+
+# 2. Reprojeter en mètres pour les calculs de superficie
+pop_m <- terra::project(pop_uk, "EPSG:27700")
+ukv_m <- st_transform(ukv, 27700)
+
+# 3. Statistiques zonales
+ukv_m$pop <- exact_extract(pop_m, ukv_m, "sum")
+ukv_m$area_km2 <- as.numeric(st_area(ukv_m)) / 1e6
+ukv_m$density  <- ukv_m$pop / ukv_m$area_km2
+
+# 4. Changement entre deux dates
+pop_change <- (pop_2020 - pop_2010) / pop_2010 * 100
+```
+:::
+
+---
+
+## Exercice — Répliquer sur la France {#sec-exercise}
+
+::: {.callout-note}
+## À vous de jouer !
+
+Reproduisez la même analyse pour la **France**, en utilisant :
+
+- `gpw_v4_..._2010_2pt5_min.tif` et `gpw_v4_..._2020_2pt5_min.tif`
+- `gadm41_FRA_3.shp` — niveau arrondissements (ou `gadm41_FRA_2.shp` pour les départements)
+- Projection **Lambert-93** (`EPSG:2154`) pour les calculs de superficie
+
+**Étapes :**
+
+1. Chargez les deux rasters et le shapefile
+2. Recadrez et masquez sur la France métropolitaine
+3. Reprojetez en Lambert-93
+4. Calculez la densité de population 2010 et 2020 par unité administrative
+5. Cartographiez les deux années côte à côte
+6. Calculez et cartographiez l'évolution 2010–2020
+
+**→ Corrigé : [4.1b — Densité de Population France](4_1b_densite_pop_France.qmd)**
+:::
+
+---
+
+## Liens utiles {#sec-links}
+
+- [GPW v4 — SEDAC Columbia](https://sedac.ciesin.columbia.edu/data/collection/gpw-v4)
+- [exactextractr documentation](https://isciences.gitlab.io/exactextractr/)
+- [GADM administrative boundaries](https://gadm.org)
+- [Geocomputation with R — Raster–vector interactions](https://geocompr.robinlovelace.net/spatial-cv.html)
+
+---
+
+> **← Précédent : [Interpolation Spatiale](3_1_interpolation.qmd)**
+> **→ Suivant : Réponses**
+
+---
+
+*Dr. Elisabetta Pietrostefani — Directrice Adjointe, Geographic Data Science Lab — Université de Liverpool | Co-Directrice, [Imago : Data Service for Imagery](https://imago.ac.uk/) | Chercheuse Associée, London School of Economics*

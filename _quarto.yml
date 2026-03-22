@@ -1,0 +1,58 @@
+project:
+  type: book
+  output-dir: docs
+
+book:
+  title: "RCarto"
+  author: "Dr. Elisabetta Pietrostefani"
+  date: today
+  chapters:
+    - index.qmd
+    - introduction.qmd
+
+    - part: "Section 1 — Basics"
+      chapters:
+        - simplefeatures.qmd
+        - choropleths.qmd
+        - crs.qmd
+        - raster.qmd
+
+    - part: "Section 2 — Géotraitement et Analyse Spatiale"
+      chapters:
+        - geoprocessing_Londres.qmd
+        - indices_topo.qmd
+        - interpolation.qmd
+
+    - part: "Réponses"
+      chapters:
+        - geoprocessing_Paris.qmd
+        - indices_topo_Corse.qmd
+        - interpolation_Paris.qmd
+
+  page-footer:
+    left: |
+      RCarto par Dr. Elisabetta Pietrostefani.
+    right: |
+      Ce livre a été construit avec <a href="https://quarto.org/">Quarto</a>.
+  site-url: https://pietrostefani.github.io/rcarto
+  repo-url: https://github.com/pietrostefani/rcarto
+  repo-actions: [edit]
+  sharing: [twitter, facebook]
+  cover-image-alt: |
+    R pour la Cartographie et les SIG
+  twitter-card:
+    creator: "@EPietrostefani"
+
+bibliography: references.bib
+margin-header: |
+  ![](/logos_web.png)
+
+format:
+  html:
+    theme:
+      - cosmo
+      - r4gds.scss
+  pdf:
+    documentclass: scrreprt
+
+editor: visual

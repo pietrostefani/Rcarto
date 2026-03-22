@@ -1,0 +1,661 @@
+---
+title: "Géotraitement"
+author: "Dr. Elisabetta Pietrostefani"
+date: today
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    toc-title: "Table des matières"
+    number-sections: true
+    code-fold: show
+    code-tools: true
+    theme: cosmo
+    highlight-style: github
+    embed-resources: true
+    fig-align: center
+    fig-width: 8
+    fig-height: 6
+execute:
+  warning: false
+  message: false
+  echo: true
+---
+
+## Introduction {#sec-intro}
+
+Dans ce chapitre, nous appliquons les concepts vus jusqu'ici à un cas concret : les **ventes immobilières à Londres**. Nous allons charger des données, les spatialiser, les joindre, les agréger, et produire des cartes publiables.
+
+Les opérations que nous couvrons — jointure spatiale, zone tampon, intersection, calcul de distance — constituent le cœur du **géotraitement** (*geoprocessing*).
+
+```{r}
+#| label: setup
+#| message: false
+
+library(sf)
+library(ggplot2)
+library(dplyr)
+library(viridis)
+library(ggspatial)
+library(spdep)
+library(scales)
+```
+
+------------------------------------------------------------------------
+
+## Charger et spatialiser les données {#sec-load}
+
+### Exercice 1 — Charger les données
+
+Chargez le shapefile des districts londoniens et le fichier CSV des ventes immobilières.
+
+::: callout-tip
+## Indice
+
+Pour lire un shapefile dans R avec `sf`, la fonction est `read_sf()`. Pour un CSV, c'est `read.csv()`.
+:::
+
+```{r}
+#| label: ex1-question
+#| eval: false
+
+# À compléter
+london <- ___(dsn = "data/London/Polygons/districts.shp")
+ventes <- read.csv("data/London/Tables/housesales.csv")
+```
+
+```{r}
+#| label: ex1-answer
+#| code-fold: true
+#| code-summary: "Voir la réponse"
+
+london <- read_sf(dsn = "data/London/Polygons/districts.shp")
+ventes <- read.csv("data/London/Tables/housesales.csv")
+```
+
+### Exercice 2 — Créer des points spatiaux
+
+Le fichier `ventes` est un data frame ordinaire avec des colonnes de coordonnées. Convertissez-le en objet `sf` avec `st_as_sf()`. Les coordonnées se trouvent dans les colonnes 17 et 18.
+
+::: callout-tip
+## Indice
+
+`st_as_sf(data, coords = c(col_lon, col_lat))` — passez les numéros de colonnes ou les noms.
+:::
+
+```{r}
+#| label: ex2-question
+#| eval: false
+
+ventes <- st_as_sf(ventes, coords = c(___, ___))
+```
+
+```{r}
+#| label: ex2-answer
+#| code-fold: true
+#| code-summary: "Voir la réponse"
+
+ventes <- st_as_sf(ventes, coords = c(17, 18))
+```
+
+### Exercice 3 — Définir le bon SCR
+
+Les coordonnées de Londres sont en **British National Grid** (`EPSG:27700`). Définissez ce SCR sur l'objet `ventes`.
+
+::: callout-tip
+## Indice
+
+Souvenez-vous de la distinction `st_set_crs()` vs `st_transform()` — ici nous *déclarons* le SCR, nous ne reprojetons pas.
+:::
+
+```{r}
+#| label: ex3-question
+#| eval: false
+
+ventes <- st_set_crs(ventes, ___)
+```
+
+```{r}
+#| label: ex3-answer
+#| code-fold: true
+#| code-summary: "Voir la réponse"
+
+ventes <- st_set_crs(ventes, 27700)
+```
+
+------------------------------------------------------------------------
+
+## Visualiser les données {#sec-viz}
+
+Maintenant que les données sont chargées, explorons-les visuellement. Ce bloc est entièrement fourni — lisez le code attentivement, chaque ligne est commentée.
+
+### Construire une carte pas à pas avec `ggplot2`
+
+```{r}
+#| label: fig-wards-base
+#| fig-cap: "Wards londoniens — carte de base"
+
+wards <- read_sf("data/London/Polygons/wards.shp")
+wards$level4p  <- wards$LEVEL4_5 / wards$POP16_74
+wards$level4pp <- wards$level4p * 100
+
+# Carte minimale
+ggplot(wards) +
+  geom_sf(fill = "grey90", color = "white", linewidth = 0.2) +
+  theme_void(base_size = 12) +
+  labs(title = "Wards de Londres", caption = "Source : données Londres | Cours R-Carto") +
+  theme(plot.title = element_text(face = "bold", hjust = 0.5))
+```
+
+```{r}
+#| label: fig-wards-choro
+#| fig-cap: "Part de la population avec qualification niveau 4+ par ward — palette divergente"
+
+ggplot(wards) +
+  geom_sf(aes(fill = level4p), color = "white", linewidth = 0.15) +
+scale_fill_viridis_c(
+  name   = "Niveau 4+",
+  option = "mako",
+  labels = label_percent()
+) +
+  labs(
+    title   = "Part de la population avec qualification niveau 4+",
+    caption = "Source : Recensement 2001 | Cours R-Carto"
+  ) +
+  theme_void(base_size = 12) +
+  theme(plot.title = element_text(face = "bold", hjust = 0.5))
+```
+
+```{r}
+#| label: fig-wards-full
+#| fig-cap: "Carte complète avec échelle et flèche nord"
+
+ggplot(wards) +
+  geom_sf(aes(fill = level4p), color = "white", linewidth = 0.15) +
+scale_fill_viridis_c(
+  name   = "Niveau 4+",
+  option = "mako",
+  labels = label_percent()
+) +
+  annotation_scale(location = "bl") +
+  annotation_north_arrow(location = "bl", pad_y = unit(1, "cm"),
+                          style = north_arrow_fancy_orienteering()) +
+  labs(
+    title   = "Qualification niveau 4+ — Wards de Londres",
+    caption = "Source : Recensement 2001 | Cours R-Carto"
+  ) +
+  theme_void(base_size = 12) +
+  theme(plot.title = element_text(face = "bold", hjust = 0.5))
+```
+
+------------------------------------------------------------------------
+
+## Ajouter les points de vente {#sec-points}
+
+### Exercice 4 — Carte de base de Londres
+
+Créez une carte simple des districts londoniens avec `ggplot2`.
+
+```{r}
+#| label: ex4-question
+#| eval: false
+
+map1 <- ggplot() +
+  ___(data = london, ___) +
+  theme_void()
+map1
+```
+
+```{r}
+#| label: ex4-answer
+#| code-fold: true
+#| code-summary: "Voir la réponse"
+#| fig-cap: "Districts londoniens avec étiquettes"
+
+map1 <- ggplot() +
+  geom_sf(data = london, fill = "grey95", color = "white", linewidth = 0.4) +
+  geom_sf_text(data = london, aes(label = DIST_NAME),
+               fun.geometry = sf::st_centroid, size = 2, color = "grey30") +
+  theme_void(base_size = 12) +
+  labs(title   = "Districts de Londres",
+       caption = "Source : données Londres | Cours R-Carto") +
+  theme(plot.title = element_text(face = "bold", hjust = 0.5))
+map1
+```
+
+### Exercice 5 — Superposer les points de vente
+
+Ajoutez les transactions immobilières (`ventes`) à la carte `map1`.
+
+::: callout-tip
+## Indice
+
+Dans `ggplot2`, on ajoute une couche avec `+` et un nouveau `geom_sf()`.
+:::
+
+```{r}
+#| label: ex5-question
+#| eval: false
+
+map1 + ___(data = ventes, ___)
+```
+
+```{r}
+#| label: ex5-answer
+#| code-fold: true
+#| code-summary: "Voir la réponse"
+#| fig-cap: "Transactions immobilières superposées aux districts"
+
+map1 +
+  geom_sf(data = ventes, color = "#d7191c", size = 0.3, alpha = 0.4)
+```
+
+------------------------------------------------------------------------
+
+## Jointure spatiale {#sec-spatial-join}
+
+Une **jointure spatiale** (`st_join()`) associe à chaque point le polygone dans lequel il tombe — ici, chaque vente immobilière hérite des attributs du district qui la contient.
+
+```{r}
+#| label: join-explain
+
+# Rappel des fonctions spatiales disponibles :
+# st_join(polygons, points)  → jointure spatiale
+# st_intersects(x, y)        → renvoie les indices des objets qui se croisent
+# st_intersection(x, y)      → renvoie les géométries découpées à l'intersection
+```
+
+### Exercice 6 — Jointure spatiale districts × ventes
+
+Créez un objet `ventes_districts` qui joint les polygones des districts avec les points de vente.
+
+::: callout-tip
+## Indice
+
+`st_join(polygons, points)` — l'ordre compte : le premier argument donne la structure géométrique du résultat.
+:::
+
+```{r}
+#| label: ex6-question
+#| eval: false
+
+ventes_districts <- st_join(___, ___)
+head(ventes_districts)
+```
+
+```{r}
+#| label: ex6-answer
+#| code-fold: true
+#| code-summary: "Voir la réponse"
+
+ventes_districts <- st_join(london, ventes)
+head(ventes_districts)
+```
+
+------------------------------------------------------------------------
+
+## Agréger les données {#sec-aggregate}
+
+### Exercice 7 — Prix moyen par district
+
+À partir de `ventes_districts`, calculez pour chaque district : le nombre de ventes et le prix moyen.
+
+::: callout-tip
+## Indice
+
+Utilisez `group_by()` + `summarise()` du tidyverse. Le prix est dans la colonne `price`.
+:::
+
+```{r}
+#| label: ex7-question
+#| eval: false
+
+ventes_districts_agg <- ventes_districts |>
+  group_by(___, ___) |>
+  summarise(
+    count_sales = n(),
+    mean_price  = mean(___, na.rm = TRUE)
+  )
+head(ventes_districts_agg)
+```
+
+```{r}
+#| label: ex7-answer
+#| code-fold: true
+#| code-summary: "Voir la réponse"
+
+ventes_districts_agg <- ventes_districts |>
+  group_by(DIST_CODE, DIST_NAME) |>
+  summarise(
+    count_sales = n(),
+    mean_price  = mean(price, na.rm = TRUE)
+  )
+head(ventes_districts_agg)
+```
+
+### Exercice 8 — Améliorer la carte des prix
+
+La carte ci-dessous est fonctionnelle mais peu lisible. Améliorez-la en ajoutant : une palette `viridis` option `"magma"`, des labels en livres sterling (£), et un meilleur thème.
+
+```{r}
+#| label: fig-map2-base
+#| fig-cap: "Prix moyen par district — version initiale (à améliorer)"
+
+map2 <- ggplot() +
+  geom_sf(data = ventes_districts_agg, aes(fill = mean_price),
+          color = "white", linewidth = 0.3) +
+  labs(x = "", y = "")
+map2
+```
+
+```{r}
+#| label: ex8-question
+#| eval: false
+
+map3 <- ggplot() +
+  geom_sf(data = ___, aes(fill = ___),
+          color = "white", linewidth = 0.3) +
+  scale_fill_viridis(
+    name      = "Prix moyen",
+    direction = ___,
+    labels    = ___,
+    option    = "___"
+  ) +
+  labs(
+    title   = "Prix moyen des transactions immobilières — Londres",
+    caption = "Source : données Londres | Cours R-Carto"
+  ) +
+  ___()   # choisissez un thème : ?ggtheme
+map3
+```
+
+```{r}
+#| label: ex8-answer
+#| code-fold: true
+#| code-summary: "Voir la réponse"
+#| fig-cap: "Prix moyen par district — version améliorée"
+
+map3 <- ggplot() +
+  geom_sf(data = ventes_districts_agg, aes(fill = mean_price),
+          color = "white", linewidth = 0.3) +
+  scale_fill_viridis(
+    name      = "Prix moyen",
+    direction = -1,
+    labels    = dollar_format(prefix = "£"),
+    option    = "magma"
+  ) +
+  labs(
+    title   = "Prix moyen des transactions immobilières — Londres",
+    caption = "Source : données Londres | Cours R-Carto"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(plot.title = element_text(face = "bold", hjust = 0.5))
+map3
+```
+
+::: callout-note
+## Exercice 9 — Paris
+
+Maintenant que vous maîtrisez le géotraitement sur Londres, créez une carte similaire pour Paris avec les données du cours :
+
+1.  Chargez le shapefile des arrondissements parisiens
+2.  Chargez `donnees_arrondissement_enrichi.csv`
+3.  Faites la jointure avec `left_join()` sur le code arrondissement
+4.  Cartographiez une variable de votre choix (prix au m², taux de chômage, part de logements sociaux…)
+5.  Appliquez une palette et un thème adaptés
+:::
+
+------------------------------------------------------------------------
+
+## Zones tampons (*buffers*) {#sec-buffer}
+
+Une **zone tampon** est une zone géographique à une distance donnée d'un objet. Ici, nous calculons la population vivant à moins de 500 m d'un échantillon de **bâtiments classés** londoniens.
+
+### Charger les bâtiments classés
+
+```{r}
+#| label: load-buildings
+
+batiments_classes <- read_sf("data/London/Points/listed_buildings_london.shp")
+
+# Sélectionner 20 bâtiments au hasard pour l'exemple
+set.seed(42)
+sample_ids        <- sample(batiments_classes$ListEntry, 20)
+batiments_classes <- batiments_classes[batiments_classes$ListEntry %in% sample_ids, ]
+
+cat("Nombre de bâtiments sélectionnés :", nrow(batiments_classes))
+```
+
+### Télécharger les zones de recensement
+
+```{r}
+#| label: download-oas
+#| eval: false
+
+# Télécharger les zones de sortie du recensement 2011
+dir.create("data/London", recursive = TRUE, showWarnings = FALSE)
+
+download.file(
+  url     = "https://data.london.gov.uk/download/statistical-gis-boundary-files-london/9ba8c833-6370-4b11-abdc-314aa020d5e0/statistical-gis-boundaries-london.zip",
+  destfile = "data/London/statistical-gis-boundaries-london.zip"
+)
+unzip("data/London/statistical-gis-boundaries-london.zip", exdir = "data/London")
+```
+
+```{r}
+#| label: load-oas
+
+oas_census <- read_sf(
+  "data/London/statistical-gis-boundaries-london/ESRI/OA_2011_London_gen_MHW.shp"
+)
+oas_census$area_census <- st_area(oas_census)
+```
+
+```{r}
+#| label: fig-southwark
+#| fig-cap: "Zones de recensement — arrondissement de Southwark"
+
+oas_Southwark <- oas_census[oas_census$LAD11NM == "Southwark", ]
+
+ggplot(oas_Southwark) +
+  geom_sf(fill = "#1a4f7a", color = "white", linewidth = 0.2) +
+  labs(title   = "Zones de recensement — Southwark",
+       caption = "Source : recensement 2011 | Cours R-Carto") +
+  theme_void(base_size = 12) +
+  theme(plot.title = element_text(face = "bold", hjust = 0.5))
+```
+
+### Créer les zones tampons
+
+```{r}
+#| label: fig-buffers
+#| fig-cap: "Zones tampons de 500 m autour des bâtiments classés sélectionnés"
+
+# Harmoniser les SCR
+batiments_classes <- st_transform(batiments_classes, st_crs(oas_census))
+
+# Créer les zones tampons de 500 m
+buffers500m          <- st_buffer(batiments_classes, dist = 500)
+buffers500m$area_buffer <- st_area(buffers500m)
+
+ggplot() +
+  geom_sf(data = buffers500m, fill = "#cce5f0", color = "#1a6ea8",
+          linewidth = 1.0, alpha = 0.4) +
+  geom_sf(data = batiments_classes, color = "#d7191c", size = 2.5,
+          shape = 17) +
+  labs(
+    title    = "Bâtiments classés et zones tampons (500 m)",
+    subtitle = "20 bâtiments sélectionnés aléatoirement",
+    caption  = "Source : données Londres | Cours R-Carto"
+  ) +
+  theme_void(base_size = 12) +
+  theme(plot.title    = element_text(face = "bold", hjust = 0.5),
+        plot.subtitle = element_text(color = "grey40", hjust = 0.5))
+```
+
+### Intersection et population pondérée
+
+```{r}
+#| label: intersection
+
+# Corriger les géométries invalides si nécessaire
+oas_census <- st_make_valid(oas_census)
+
+# Intersection : quelles zones de recensement tombent dans les tampons ?
+buffers_inter          <- st_intersection(buffers500m, oas_census)
+buffers_inter$area_inter <- st_area(buffers_inter)
+```
+
+```{r}
+#| label: population-agg
+
+# Agréger au niveau du bâtiment — population pondérée par la part de surface couverte
+buffers_agg <- buffers_inter |>
+  mutate(
+    weight     = as.numeric(area_inter / area_buffer),
+    population = as.numeric(USUALRES)
+  ) |>
+  group_by(ListEntry) |>
+  summarise_at("population", list(sum = ~sum(. * weight)))
+
+pop_moyenne <- round(mean(buffers_agg$sum))
+cat("Population moyenne dans un rayon de 500 m :", pop_moyenne, "habitants\n")
+```
+
+La population moyenne vivant à moins de 500 m d'un bâtiment classé est `r round(mean(buffers_agg$sum))` habitants.
+
+::: callout-note
+## À noter — `st_intersection` vs `st_join` vs `st_intersects`
+
+| Fonction | Ce qu'elle renvoie |
+|----|----|
+| `st_join(x, y)` | Table jointe — chaque entité de x avec les attributs de y qui la touchent |
+| `st_intersects(x, y)` | Indices des paires qui se croisent (liste logique) |
+| `st_intersection(x, y)` | Géométries découpées à l'intersection — parties non sécantes supprimées |
+
+Référence : [R as GIS for Economists](https://tmieno2.github.io/R-as-GIS-for-Economists/spatial-intersection-cropping-join.html)
+:::
+
+------------------------------------------------------------------------
+
+## Calculs de distance {#sec-distance}
+
+`st_distance()` calcule la distance entre deux objets sf. Le résultat est une **matrice** avec des unités (mètres si la projection est en mètres).
+
+```{r}
+#| label: fig-distance
+#| fig-cap: "Centroïdes de Hackney et Southwark avec distance calculée"
+
+Hackney  <- london[london$DIST_NAME == "Hackney",  ]
+Southwark <- london[london$DIST_NAME == "Southwark", ]
+
+Hackney_centroid  <- st_centroid(Hackney)
+Southwark_centroid <- st_centroid(Southwark)
+
+dist <- st_distance(Hackney_centroid, Southwark_centroid)
+cat("Distance Hackney → Southwark :", round(as.numeric(dist)), "mètres\n")
+
+ggplot() +
+  geom_sf(data = london, fill = "grey90", color = "grey70", linewidth = 0.3) +
+  geom_sf(data = Hackney,   fill = "#2c7bb6", color = "white", linewidth = 0.5) +
+  geom_sf(data = Southwark, fill = "#d7191c", color = "white", linewidth = 0.5) +
+  geom_sf(data = Hackney_centroid,   color = "#1a4f7a", size = 4, shape = 19) +
+  geom_sf(data = Southwark_centroid, color = "#a01010", size = 4, shape = 19) +
+  geom_sf(data = st_union(Hackney_centroid, Southwark_centroid) |>
+            st_cast("LINESTRING"),
+          color = "#333333", linewidth = 1.0, linetype = "dashed") +
+  annotate("label",
+           x     = -0.03, y = 51.525,
+           label = paste0(round(as.numeric(dist) / 1000, 1), " km"),
+           size  = 4, fontface = "bold",
+           fill  = "white", label.size = 0.3) +
+  coord_sf(
+    xlim = c(st_bbox(london)["xmin"], st_bbox(london)["xmax"]),
+    ylim = c(st_bbox(london)["ymin"], st_bbox(london)["ymax"]),
+    expand = TRUE
+  ) +
+  labs(
+    title   = "Distance entre Hackney et Southwark",
+    caption = "Source : données Londres | Cours R-Carto"
+  ) +
+  theme_void(base_size = 12) +
+  theme(plot.title = element_text(face = "bold", hjust = 0.5))
+```
+
+### Matrice de distances multiples
+
+```{r}
+#| label: distance-matrix
+
+# Distance de Hackney vers Southwark et Croydon
+co <- london |> filter(grepl("Southwark|Croydon", DIST_NAME))
+st_distance(Hackney_centroid, co)
+```
+
+------------------------------------------------------------------------
+
+## Voisinage par distance {#sec-neighbours}
+
+Les **poids spatiaux par distance** identifient pour chaque point l'ensemble de ses voisins dans un rayon donné. Ici, toutes les propriétés à moins de 2 000 m.
+
+```{r}
+#| label: neighbours-dist
+#| fig-cap: "Réseau de voisinage par distance (2 000 m) — transactions immobilières"
+
+housesales    <- read.csv("data/London/Tables/housesales.csv")
+housesales_sf <- st_as_sf(housesales, coords = c(17, 18)) |>
+  st_set_crs(27700)
+
+# Voisins dans un rayon de 0 à 2000 m
+W_dist <- dnearneigh(housesales_sf, d1 = 0, d2 = 2000,
+                     row.names = housesales_sf$propid)
+
+# Convertir en liste de poids spatiaux
+W_dist_mat <- nb2listw(W_dist, zero.policy = TRUE)
+summary(W_dist_mat, zero.policy = TRUE)
+
+# Visualiser le réseau
+plot(W_dist_mat,
+     coords   = housesales[, 17:18],
+     pch      = 19,
+     cex      = 0.1,
+     col      = "#2c7bb6",
+     main     = "Voisinage par distance (2 000 m)")
+```
+
+------------------------------------------------------------------------
+
+## Récapitulatif des opérations de géotraitement {#sec-summary}
+
+::: callout-note
+## Ce qu'il faut retenir
+
+| Opération | Fonction | Usage |
+|----|----|----|
+| Spatialiser un CSV | `st_as_sf(df, coords = c(...))` | Créer des points depuis lon/lat |
+| Définir un SCR | `st_set_crs(x, epsg)` | Déclarer le SCR manquant |
+| Reprojeter | `st_transform(x, epsg)` | Changer de projection |
+| Jointure spatiale | `st_join(polygons, points)` | Associer points aux polygones |
+| Zone tampon | `st_buffer(x, dist = ...)` | Zone à distance fixe |
+| Intersection | `st_intersection(x, y)` | Découper les géométries |
+| Calculer une superficie | `st_area(x)` | Superficie en m² |
+| Calculer une distance | `st_distance(x, y)` | Distance entre entités |
+| Trouver des voisins | `dnearneigh(x, d1, d2)` | Voisinage par distance |
+:::
+
+------------------------------------------------------------------------
+
+## Liens utiles {#sec-links}
+
+-   [Geocomputation with R — Ch. 4 : Spatial data operations](https://geocompr.robinlovelace.net/spatial-operations.html)
+-   [sf cheatsheet](https://github.com/rstudio/cheatsheets/blob/main/sf.pdf)
+-   [ggplot2 themes](https://ggplot2.tidyverse.org/reference/ggtheme.html)
+-   [Spatial intersection / join comparison](https://tmieno2.github.io/R-as-GIS-for-Economists/spatial-intersection-cropping-join.html)
+
+------------------------------------------------------------------------
+
+> **← Précédent : [Choroplèthes et Classification](choropleths.qmd)** **→ Suivant : Calculs d'Indices Topographiques**
+
+------------------------------------------------------------------------
+
+*Dr. Elisabetta Pietrostefani — Directrice Adjointe, Geographic Data Science Lab — Université de Liverpool \| Co-Directrice, [Imago : Data Service for Imagery](https://imago.ac.uk/) \| Chercheuse Associée, London School of Economics*

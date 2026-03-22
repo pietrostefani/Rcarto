@@ -1,0 +1,276 @@
+---
+title: "Raster : Indices Topographiques"
+author: "Dr. Elisabetta Pietrostefani"
+date: today
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    toc-title: "Table des matières"
+    number-sections: true
+    code-fold: show
+    code-tools: true
+    theme: cosmo
+    highlight-style: github
+    embed-resources: true
+    fig-align: center
+    fig-width: 8
+    fig-height: 6
+execute:
+  warning: false
+  message: false
+  echo: true
+---
+
+## Introduction {#sec-intro}
+
+Dans les chapitres précédents, nous avons travaillé avec des données **vectorielles**. Ce chapitre introduit les opérations fondamentales sur les données **raster**, en travaillant sur un MNT (*Modèle Numérique de Terrain*) du Liban.
+
+Les quatre opérations couvertes :
+
+| Opération           | Fonction `terra`    |
+|---------------------|---------------------|
+| Charger et explorer | `rast()`            |
+| Recadrer et masquer | `crop()` + `mask()` |
+| Calculer la pente   | `terrain()`         |
+| Reclassifier        | `classify()`        |
+
+À la fin, vous reproduirez ces étapes sur la **Corse** en exercice indépendant.
+
+```{r}
+#| label: setup
+#| message: false
+
+library(terra)        # manipulation des rasters
+library(tidyterra)    # geom_spatraster() pour ggplot2
+library(sf)           # données vectorielles
+library(ggplot2)      # visualisation
+library(dplyr)        # manipulation de données
+library(scales)       # rescale()
+```
+
+::: {.callout-note collapse="true"}
+## Installer les packages si nécessaire
+
+```{r}
+#| eval: false
+install.packages(c("terra", "tidyterra"))
+```
+
+`terra` remplace l'ancien package `raster` (déprécié depuis 2023). `tidyterra` permet d'utiliser les objets `terra` directement dans `ggplot2` via `geom_spatraster()`.
+:::
+
+------------------------------------------------------------------------
+
+## Étape 1 — Charger et explorer le MNT {#sec-import}
+
+```{r}
+#| label: load-raster
+
+dem <- rast("data/Liban/LBN_elevation_w_bathymetry.tif")
+
+cat("SCR        :", crs(dem, describe = TRUE)$name, "\n")
+cat("Résolution :", res(dem), "degrés\n")
+cat("Min / Max  :", global(dem, "min", na.rm = TRUE)[[1]], "/",
+                    global(dem, "max", na.rm = TRUE)[[1]], "m\n")
+```
+
+```{r}
+#| label: fig-dem-raw
+#| fig-cap: "MNT du Liban — emprise originale"
+
+ggplot() +
+  geom_spatraster(data = dem) +
+  scale_fill_gradientn(
+    colors   = hcl.colors(50, "Terrain"),
+    name     = "Altitude (m)",
+    na.value = "transparent"
+  ) +
+  labs(title   = "MNT du Liban",
+       caption = "Source : SRTM | Cours R-Carto") +
+  theme_void(base_size = 12) +
+  theme(plot.title = element_text(face = "bold", hjust = 0.5))
+```
+
+------------------------------------------------------------------------
+
+## Étape 2 — Recadrer et masquer {#sec-crop}
+
+Le MNT couvre une zone plus large que le pays. On utilise deux opérations :
+
+-   `crop()` — découpe selon l'**emprise rectangulaire** du vecteur
+-   `mask()` — applique le **contour exact** du polygone (valeurs extérieures → `NA`)
+
+```{r}
+#| label: load-vector-crop
+
+Lebanon <- read_sf("data/Liban/LBN_adm1.shp")
+
+dem_proj  <- terra::project(dem, crs(Lebanon))
+dem_crop  <- crop(dem_proj, Lebanon)
+dem_liban <- mask(dem_crop, Lebanon)
+```
+
+```{r}
+#| label: fig-dem-liban
+#| fig-cap: "MNT recadré sur le Liban avec les gouvernorats"
+
+ggplot() +
+  geom_spatraster(data = dem_liban) +
+  scale_fill_gradientn(
+    colors   = hcl.colors(50, "Terrain"),
+    name     = "Altitude (m)",
+    na.value = "transparent"
+  ) +
+  geom_sf(data = Lebanon, fill = NA, color = "white", linewidth = 0.6) +
+  labs(title   = "MNT du Liban — recadré et masqué",
+       caption = "Source : SRTM / GADM | Cours R-Carto") +
+  theme_void(base_size = 12) +
+  theme(plot.title = element_text(face = "bold", hjust = 0.5))
+```
+
+------------------------------------------------------------------------
+
+## Étape 3 — Calculer la pente {#sec-slope}
+
+La pente mesure l'inclinaison du terrain en degrés. On utilise `terrain()` avec un MNT **projeté en mètres** pour obtenir des valeurs correctes.
+
+```{r}
+#| label: calc-slope
+
+dem_m <- rast("data/Liban/DEM_Leb_projected.tif")
+slope <- terrain(dem_m, v = "slope", unit = "degrees")
+
+cat("Pente moyenne :", round(global(slope, "mean", na.rm = TRUE)[[1]], 1), "°\n")
+cat("Pente max     :", round(global(slope, "max",  na.rm = TRUE)[[1]], 1), "°\n")
+```
+
+```{r}
+#| label: fig-slope
+#| fig-cap: "Pente du terrain — Liban (degrés)"
+
+ggplot() +
+  geom_spatraster(data = slope) +
+  scale_fill_viridis_c(
+    option   = "magma",
+    name     = "Pente (°)",
+    na.value = "transparent"
+  ) +
+  geom_sf(data = Lebanon, fill = NA, color = "white", linewidth = 0.5) +
+  labs(title   = "Pente du terrain — Liban",
+       caption = "Source : SRTM | Cours R-Carto") +
+  theme_void(base_size = 12) +
+  theme(plot.title = element_text(face = "bold", hjust = 0.5))
+```
+
+------------------------------------------------------------------------
+
+## Étape 4 — Reclassifier {#sec-reclass}
+
+La reclassification transforme un raster continu en **catégories** selon des seuils. Ici, on identifie les zones à risque d'inondation (altitude \< 10 m).
+
+```{r}
+#| label: reclassify
+
+rcl <- matrix(c(
+  -Inf,  10, 1,
+    10, Inf, 0
+), ncol = 3, byrow = TRUE)
+
+flood_risk <- classify(dem_m, rcl)
+
+freq_tbl <- freq(flood_risk)
+pct_risk  <- round(freq_tbl$count[freq_tbl$value == 1] /
+                   sum(freq_tbl$count) * 100, 1)
+cat("Proportion de zones à risque (< 10 m) :", pct_risk, "%\n")
+```
+
+```{r}
+#| label: fig-flood
+#| fig-cap: "Zones à risque d'inondation côtière — altitude < 10 m"
+
+ggplot() +
+  geom_spatraster(data = as.factor(flood_risk)) +
+  scale_fill_manual(
+    values   = c("0" = "#d9d9d9", "1" = "#2166ac"),
+    labels   = c("0" = "Hors risque (≥ 10 m)", "1" = "Zone à risque (< 10 m)"),
+    name     = "",
+    na.value = "transparent"
+  ) +
+  geom_sf(data = Lebanon, fill = NA, color = "grey40", linewidth = 0.5) +
+  labs(title    = "Zones à risque d'inondation — Liban",
+       subtitle = "Altitude inférieure à 10 m",
+       caption  = "Source : SRTM | Cours R-Carto") +
+  theme_void(base_size = 12) +
+  theme(plot.title      = element_text(face = "bold", hjust = 0.5),
+        plot.subtitle   = element_text(color = "grey40", hjust = 0.5),
+        legend.position = "bottom")
+```
+
+------------------------------------------------------------------------
+
+## Récapitulatif {#sec-summary}
+
+::: callout-note
+## Les 4 opérations raster essentielles
+
+``` r
+# 1. Charger
+dem <- rast("fichier.tif")
+
+# 2. Recadrer + masquer
+dem_zone <- crop(dem, vecteur) |> mask(vecteur)
+
+# 3. Calculer la pente (MNT projeté en mètres obligatoire)
+slope <- terrain(dem_proj, v = "slope", unit = "degrees")
+
+# 4. Reclassifier
+rcl   <- matrix(c(0, 10, 1, 10, Inf, 0), ncol = 3, byrow = TRUE)
+zones <- classify(dem, rcl)
+```
+
+Pour assembler des tuiles : `mosaic(t1, t2, t3, t4, fun = "mean")`
+:::
+
+------------------------------------------------------------------------
+
+## À vous de jouer — Exercice Corse {#sec-exercise}
+
+::: callout-note
+## Reproduire l'analyse sur la Corse
+
+La Corse présente une topographie contrastée similaire au Liban : côte méditerranéenne et massif montagneux dépassant 2 700 m. Reproduisez les quatre étapes ci-dessus avec les données corses.
+
+**Fichiers disponibles dans `data/France/Corse/` :**
+
+| Fichier | Description |
+|----|----|
+| `Corse_tout_lambert.tif` | MNT complet en Lambert-93 |
+| `DEM_corse_1_Lambert93.tif` | Tuile projetée en mètres (pour la pente) |
+| `DEM_corse_1.tif` → `DEM_corse_4.tif` | 4 tuiles WGS84 à assembler avec `mosaic()` |
+
+**Étapes :**
+
+1.  Chargez `Corse_tout_lambert.tif` — ou assemblez les 4 tuiles avec `mosaic()`
+2.  Visualisez le MNT
+3.  Calculez la pente à partir de `DEM_corse_1_Lambert93.tif`
+4.  Reclassifiez en 4 zones : 0–200 m · 200–800 m · 800–1500 m · \> 1500 m
+
+**→ Corrigé : [Corse](indices_topo_Corse.qmd)**
+:::
+
+------------------------------------------------------------------------
+
+## Liens utiles {#sec-links}
+
+-   [terra documentation](https://rspatial.org/terra/)
+-   [tidyterra](https://dieghernan.github.io/tidyterra/)
+-   [Geocomputation with R — Raster operations](https://geocompr.robinlovelace.net/spatial-operations.html#spatial-ras)
+
+------------------------------------------------------------------------
+
+> **← Précédent : [Géotraitement Paris](geoprocessing_Paris.qmd)** **→ Suivant : [Analyse Avancée](interpolation.qmd)**
+
+------------------------------------------------------------------------
+
+*Dr. Elisabetta Pietrostefani — Directrice Adjointe, Geographic Data Science Lab — Université de Liverpool \| Co-Directrice, [Imago : Data Service for Imagery](https://imago.ac.uk/) \| Chercheuse Associée, London School of Economics*

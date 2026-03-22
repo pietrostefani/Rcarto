@@ -1,0 +1,131 @@
+---
+title: "R pour la Cartographie"
+subtitle: "Formation"
+author: "Dr. Elisabetta Pietrostefani"
+date: today
+format:
+  html:
+    toc: false
+    number-sections: false
+---
+
+::: hero-banner
+:::
+
+## Bienvenue {.unnumbered}
+
+Ce site rassemble les supports de la formation **R pour la Cartographie et les SIG**.
+
+La formation vous permettra d'**analyser et visualiser des données géographiques avec R**, en passant des fondamentaux — objets spatiaux, choroplèthes, projections, raster — jusqu'au géotraitement avancé et à l'interpolation spatiale. Tout le cours est construit autour de `ggplot2` comme outil de visualisation unique, et de données réelles : transactions immobilières à Londres, annonces Airbnb à Paris, MNT du Liban et de la Corse.
+
+---
+
+### Programme {.unnumbered}
+
+::::::: grid
+::: g-col-6
+### Les fondamentaux
+
+[**Introduction**](introduction.qmd)
+
+Pourquoi les SIG ? Types de données, environnement R/RStudio.
+
+[**Objets Spatiaux**](simplefeatures.qmd)
+
+Types géométriques, objets `sf`, premières cartes avec `ggplot2`.
+
+[**Choroplèthes**](choropleths.qmd)
+
+Classification (Jenks, quantiles, écart-type), palettes séquentielles, divergentes et catégorielles.
+
+[**Systèmes de Coordonnées**](crs.qmd)
+
+SCR géographiques vs projetés, reprojection, comparaison de projections.
+
+[**Données Raster**](raster.qmd)
+
+Introduction aux MNT, packages `terra` et `stars`, `geom_spatraster()`.
+:::
+
+::: g-col-6
+### Géotraitement et Analyse Spatiale
+
+[**Géotraitement — Londres**](geoprocessing_Londres.qmd)
+
+Jointure spatiale, zones tampons, intersection, distance, voisinage — données immobilières londoniennes.
+
+*Exercice → [Paris Airbnb](geoprocessing_Paris.qmd)*
+
+[**Indices Topographiques**](indices_topo.qmd)
+
+Recadrage, pente, reclassification raster — Liban comme démonstration.
+
+*Exercice → [Corse](indices_topo_Corse.qmd)*
+
+[**Interpolation Spatiale**](interpolation.qmd)
+
+IDW (Pondération Inverse à la Distance) et heatmaps — prix immobiliers à Londres.
+
+*Exercice → [Paris Airbnb](interpolation_Paris.qmd)*
+:::
+:::::::
+
+---
+
+## Prérequis {.unnumbered}
+
+- R (≥ 4.3) et RStudio installés
+- Notions de base de R (data frames, fonctions)
+- Packages à installer avant la formation :
+
+```r
+install.packages(c(
+  # Données vectorielles
+  "sf",
+  "spData",             # jeux de données géographiques d'exemple
+
+  # Données raster
+  "terra",
+  "stars",
+  "tidyterra",          # geom_spatraster() — terra + ggplot2
+
+  # Visualisation
+  "ggplot2",
+  "patchwork",          # assembler plusieurs graphiques
+
+  # Palettes et mise en forme
+  "viridis",
+  "RColorBrewer",
+  "scales",
+  "ggspatial",          # flèche nord et barre d'échelle
+
+  # Manipulation de données
+  "dplyr",
+  "classInt",           # méthodes de classification choroplèthe
+
+  # Données géographiques
+  "rnaturalearth",
+  "rnaturalearthdata",
+  "maps",
+
+  # Analyse spatiale
+  "spdep",              # poids spatiaux et voisinage
+  "gstat",              # interpolation IDW
+  "exactextractr",      # statistiques zonales raster → polygones
+
+  # Cartes interactives
+  "leaflet",
+
+  # Cartographie thématique
+  "mapsf"
+))
+```
+
+---
+
+## Formatrice {.unnumbered}
+
+**Dr. Elisabetta Pietrostefani**\
+Directrice Adjointe, Geographic Data Science Lab — Université de Liverpool\
+Chercheuse Associée, London School of Economics & Political Science\
+Co-Directrice, [Imago : Data Service for Imagery](https://imago.ac.uk/)

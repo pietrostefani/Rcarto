@@ -1,0 +1,225 @@
+---
+title: "Raster : Corse"
+author: "Dr. Elisabetta Pietrostefani"
+date: today
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    toc-title: "Table des matières"
+    number-sections: true
+    code-fold: false
+    code-tools: true
+    theme: cosmo
+    highlight-style: github
+    embed-resources: true
+    fig-align: center
+    fig-width: 8
+    fig-height: 6
+execute:
+  warning: false
+  message: false
+  echo: true
+---
+
+::: callout-important
+## Corrigé — à consulter après avoir essayé par vous-mêmes
+
+Ce document contient les réponses complètes à l'exercice Corse posé à la fin de [Raster : Indices Topographiques](indices_topo.qmd). Essayez d'abord par vous-mêmes avant de consulter ce corrigé.
+:::
+
+```{r}
+#| label: setup
+#| message: false
+
+library(terra)
+library(tidyterra)
+library(sf)
+library(ggplot2)
+library(dplyr)
+library(scales)
+```
+
+------------------------------------------------------------------------
+
+## Exercice 1 — Charger le MNT {#sec-load}
+
+Deux options sont disponibles selon les fichiers à disposition.
+
+**Option A — MNT complet déjà assemblé (plus simple)**
+
+```{r}
+#| label: load-dem
+#| fig-cap: "MNT de la Corse — Lambert-93"
+
+dem_corse <- rast("data/France/Corse/Corse_tout_lambert.tif")
+
+cat("SCR        :", crs(dem_corse, describe = TRUE)$name, "\n")
+cat("Résolution :", res(dem_corse), "\n")
+cat("Min / Max  :", global(dem_corse, "min", na.rm = TRUE)[[1]], "/",
+                    global(dem_corse, "max", na.rm = TRUE)[[1]], "m\n")
+
+ggplot() +
+  geom_spatraster(data = dem_corse) +
+  scale_fill_gradientn(
+    colors   = hcl.colors(50, "Terrain"),
+    name     = "Altitude (m)",
+    na.value = "transparent"
+  ) +
+  labs(title   = "MNT de la Corse",
+       caption = "Source : données Corse | Cours R-Carto") +
+  theme_void(base_size = 12) +
+  theme(plot.title = element_text(face = "bold", hjust = 0.5))
+```
+
+**Option B — Assembler les 4 tuiles avec `mosaic()`**
+
+```{r}
+#| label: mosaic-tiles
+#| eval: false
+
+t1 <- rast("data/France/Corse/DEM_corse_1.tif")
+t2 <- rast("data/France/Corse/DEM_corse_2.tif")
+t3 <- rast("data/France/Corse/DEM_corse_3.tif")
+t4 <- rast("data/France/Corse/DEM_corse_4.tif")
+
+dem_corse <- mosaic(t1, t2, t3, t4, fun = "mean")
+```
+
+::: callout-tip
+## Quand utiliser `mosaic()` ?
+
+Les MNT à haute résolution couvrant un territoire étendu sont souvent distribués en **tuiles** pour des raisons de taille de fichier. `mosaic()` les assemble en un seul raster en appliquant une fonction (ici `"mean"`) aux cellules qui se chevauchent sur les bords.
+:::
+
+------------------------------------------------------------------------
+
+## Exercice 2 — Calculer la pente {#sec-slope}
+
+On utilise `DEM_corse_1_Lambert93.tif` — déjà projeté en mètres. Le SCR en mètres est **indispensable** : avec des coordonnées en degrés, les valeurs de pente seraient fausses car les unités horizontales et verticales seraient incompatibles.
+
+```{r}
+#| label: calc-slope
+
+dem_corse_m <- rast("data/France/Corse/DEM_corse_1_Lambert93.tif")
+
+slope_corse <- terrain(dem_corse_m, v = "slope", unit = "degrees")
+
+cat("Pente moyenne :", round(global(slope_corse, "mean", na.rm = TRUE)[[1]], 1), "°\n")
+cat("Pente max     :", round(global(slope_corse, "max",  na.rm = TRUE)[[1]], 1), "°\n")
+```
+
+```{r}
+#| label: fig-slope
+#| fig-cap: "Pente du terrain — Corse (degrés)"
+
+ggplot() +
+  geom_spatraster(data = slope_corse) +
+  scale_fill_viridis_c(
+    option   = "magma",
+    name     = "Pente (°)",
+    na.value = "transparent"
+  ) +
+  labs(title    = "Pente du terrain — Corse",
+       subtitle = "Calculée à partir du MNT projeté en Lambert-93",
+       caption  = "Source : données Corse | Cours R-Carto") +
+  theme_void(base_size = 12) +
+  theme(plot.title    = element_text(face = "bold", hjust = 0.5),
+        plot.subtitle = element_text(color = "grey40", hjust = 0.5))
+```
+
+------------------------------------------------------------------------
+
+## Exercice 3 — Reclassifier en zones altitudinales {#sec-reclass}
+
+```{r}
+#| label: reclassify
+
+rcl_corse <- matrix(c(
+     0,  200, 1,   # Littoral
+   200,  800, 2,   # Basse montagne
+   800, 1500, 3,   # Montagne
+  1500,  Inf, 4    # Haute montagne
+), ncol = 3, byrow = TRUE)
+
+corse_zones <- classify(dem_corse, rcl_corse)
+
+# Résumé par zone — group and sum to handle any floating point values
+freq_zones <- freq(corse_zones) |>
+  filter(value %in% 1:4) |>
+  group_by(value) |>
+  summarise(count = sum(count), .groups = "drop") |>
+  mutate(
+    pct  = round(count / sum(count) * 100, 1),
+    zone = case_when(
+      value == 1 ~ "Littoral (0–200 m)",
+      value == 2 ~ "Basse montagne (200–800 m)",
+      value == 3 ~ "Montagne (800–1500 m)",
+      value == 4 ~ "Haute montagne (> 1500 m)"
+    )
+  )
+
+knitr::kable(freq_zones[, c("zone", "count", "pct")],
+             col.names = c("Zone", "Cellules", "Part (%)"),
+             caption   = "Répartition des cellules par zone altitudinale")
+```
+
+```{r}
+#| label: fig-zones
+#| fig-cap: "Zones altitudinales de la Corse — reclassification en 4 catégories"
+
+ggplot() +
+  geom_spatraster(data = as.factor(corse_zones)) +
+  scale_fill_manual(
+    values   = c("1" = "#74add1", "2" = "#fee090",
+                 "3" = "#fc8d59", "4" = "#d73027"),
+    labels   = c("1" = "Littoral (0–200 m)",
+                 "2" = "Basse montagne (200–800 m)",
+                 "3" = "Montagne (800–1500 m)",
+                 "4" = "Haute montagne (> 1500 m)"),
+    name     = "Zone altitudinale",
+    na.value = "transparent"
+  ) +
+  labs(title    = "Zones altitudinales — Corse",
+       subtitle = "Reclassification du MNT en 4 catégories",
+       caption  = "Source : données Corse | Cours R-Carto") +
+  theme_void(base_size = 12) +
+  theme(plot.title       = element_text(face = "bold", hjust = 0.5),
+        plot.subtitle    = element_text(color = "grey40", hjust = 0.5),
+        legend.position  = "bottom",
+        legend.direction = "vertical")
+```
+
+------------------------------------------------------------------------
+
+## Exercice Bonus — Comparer Liban et Corse {#sec-bonus}
+
+```{r}
+#| label: comparison
+
+stats <- data.frame(
+  territoire = c("Liban", "Corse"),
+  alt_moy    = c(
+    global(rast("data/Liban/LBN_elevation_w_bathymetry.tif"), "mean", na.rm = TRUE)[[1]],
+    global(dem_corse, "mean", na.rm = TRUE)[[1]]
+  ),
+  alt_max    = c(
+    global(rast("data/Liban/LBN_elevation_w_bathymetry.tif"), "max",  na.rm = TRUE)[[1]],
+    global(dem_corse, "max",  na.rm = TRUE)[[1]]
+  ),
+  superficie_km2 = c(10452, 8680)
+)
+
+knitr::kable(stats, digits = 0,
+             col.names = c("Territoire", "Altitude moy. (m)",
+                           "Altitude max. (m)", "Superficie (km²)"),
+             caption = "Comparaison topographique Liban / Corse")
+```
+
+------------------------------------------------------------------------
+
+> **← Retour au cours : [Raster : Indices Topographiques](indices_topo.qmd)** **→ Suivant : [Analyse Avancée](interpolation.qmd)**
+
+------------------------------------------------------------------------
+
+*Dr. Elisabetta Pietrostefani — Directrice Adjointe, Geographic Data Science Lab — Université de Liverpool \| Co-Directrice, [Imago : Data Service for Imagery](https://imago.ac.uk/) \| Chercheuse Associée, London School of Economics*

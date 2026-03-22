@@ -1,0 +1,674 @@
+---
+title: "Géotraitement : Paris"
+author: "Dr. Elisabetta Pietrostefani"
+date: today
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    toc-title: "Table des matières"
+    number-sections: true
+    code-fold: show
+    code-tools: true
+    theme: cosmo
+    highlight-style: github
+    embed-resources: true
+    fig-align: center
+    fig-width: 8
+    fig-height: 7
+execute:
+  warning: false
+  message: false
+  echo: true
+---
+
+## Introduction {#sec-intro}
+
+Dans le chapitre précédent, vous avez appliqué les opérations de géotraitement à Londres : charger des données, les spatialiser, les joindre et les cartographier. Il est maintenant temps de **reproduire ces étapes pour Paris**, avec de vraies données socio-économiques par arrondissement.
+
+Vous disposez de :
+
+-   Un **shapefile** des arrondissements parisiens (`arrondiss_lambert.shp`)
+-   Un fichier **CSV enrichi** (`donnees_arrondissement_enrichi.csv`) avec des données socio-économiques par arrondissement
+-   Des données **Airbnb** et des **données d'arbres** pour aller plus loin
+
+::: callout-tip
+## Rappel des fonctions clés vues à Londres
+
+| Opération             | Fonction                             |
+|-----------------------|--------------------------------------|
+| Lire un shapefile     | `read_sf("chemin/fichier.shp")`      |
+| Vérifier le SCR       | `st_crs(objet)$srid`                 |
+| Reprojeter            | `st_transform(objet, 2154)`          |
+| Spatialiser un CSV    | `st_as_sf(df, coords = c(lon, lat))` |
+| Jointure attributaire | `left_join(x, y, by = ...)`          |
+| Jointure spatiale     | `st_join(polygones, points)`         |
+| Agréger               | `group_by() |> summarise()`          |
+:::
+
+```{r}
+#| label: setup
+#| message: false
+
+library(sf)
+library(ggplot2)
+library(dplyr)
+library(viridis)
+library(scales)
+library(ggspatial)
+library(classInt)
+```
+
+------------------------------------------------------------------------
+
+## Charger et préparer les données {#sec-load}
+
+### Exercice 1 — Charger les polygones de Paris
+
+Chargez le shapefile des arrondissements et des communes du Grand Paris, vérifiez leurs SCR et reprojetez en Lambert-93.
+
+```{r}
+#| label: ex1-question
+#| eval: false
+
+PA        <- read_sf("data/Paris/Polygons/arrondiss_lambert.shp")
+GrandParis <- read_sf("data/Paris/Polygons/communes_grandsparis.shp")
+
+# Vérifier les SCR
+st_crs(PA)$srid
+st_crs(GrandParis)$srid
+
+# Reprojeter les deux en Lambert-93
+PA         <- st_transform(___, ___)
+GrandParis <- st_transform(___, ___)
+```
+
+```{r}
+#| label: ex1-answer
+#| code-fold: true
+#| code-summary: "Voir la réponse"
+#| fig-cap: "Arrondissements de Paris et communes du Grand Paris"
+
+PA        <- read_sf("data/Paris/Polygons/arrondiss_lambert.shp")
+GrandParis <- read_sf("data/Paris/Polygons/communes_grandsparis.shp")
+
+PA         <- st_transform(PA,         2154)
+GrandParis <- st_transform(GrandParis, 2154)
+
+# Visualisation
+ggplot() +
+  geom_sf(data = GrandParis, aes(fill = as.factor(C_DEP)),
+          color = "white", linewidth = 0.3, show.legend = FALSE) +
+  scale_fill_manual(values = c("75" = "#d9d9d9", "92" = "#bdbdbd",
+                               "93" = "#969696", "94" = "#737373",
+                               "91" = "#525252")) +
+  geom_sf(data = PA, fill = "#1a4f7a", color = "white", linewidth = 0.5) +
+  geom_sf_text(data = PA, aes(label = c_ar),
+               fun.geometry = sf::st_centroid,
+               size = 1.5, color = "white", fontface = "bold") +
+  labs(
+    title    = "Paris et le Grand Paris",
+    subtitle = "Arrondissements parisiens (bleu foncé) et communes limitrophes",
+    caption  = "Source : données Paris | Cours R-Carto"
+  ) +
+  theme_void(base_size = 12) +
+  theme(
+    plot.title    = element_text(face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(color = "grey40", hjust = 0.5)
+  )
+```
+
+### Exercice 2 — Charger les données socio-économiques
+
+Chargez le fichier `donnees_arrondissement_enrichi.csv` et examinez sa structure. Ce fichier contient les variables suivantes :
+
+| Variable            | Description                                      |
+|---------------------|--------------------------------------------------|
+| `c_arinsee`         | Code INSEE de l'arrondissement (clé de jointure) |
+| `prix_m2_appart`    | Prix moyen au m² (€)                             |
+| `taux_chomage`      | Taux de chômage (%)                              |
+| `part_log_sociaux`  | Part de logements sociaux (%)                    |
+| `revenu_median`     | Revenu médian mensuel (€)                        |
+| `densite_pop_km2`   | Densité de population (hab/km²)                  |
+| `part_moins_20ans`  | Part des moins de 20 ans (%)                     |
+| `part_plus_65ans`   | Part des plus de 65 ans (%)                      |
+| `part_diplomes_sup` | Part de diplômés du supérieur (%)                |
+| `n_musees`          | Nombre de musées                                 |
+
+```{r}
+#| label: ex2-question
+#| eval: false
+
+donnees <- read.csv("data/Paris/Tables/donnees_arrondissement_enrichi.csv")
+head(___)
+```
+
+```{r}
+#| label: ex2-answer
+#| code-fold: true
+#| code-summary: "Voir la réponse"
+
+donnees <- read.csv("data/Paris/Tables/donnees_arrondissement_enrichi.csv") |>
+  mutate(across(where(is.character), ~ {
+    x <- gsub(",", "", .x)
+    ifelse(grepl("^-?[0-9.]+$", x), as.numeric(x), .x)
+  }))
+
+head(donnees)
+```
+
+### Exercice 3 — Jointure attributaire
+
+Joignez les données socio-économiques aux polygones des arrondissements. La clé de jointure est `c_arinsee` dans les deux tables.
+
+::: callout-tip
+## Rappel
+
+`left_join(x, y, by = c("cle_x" = "cle_y"))` — conserve toutes les lignes de `x` et ajoute les colonnes de `y` là où les clés correspondent.
+:::
+
+```{r}
+#| label: ex3-question
+#| eval: false
+
+PA_data <- left_join(___, ___,
+                     by = c("c_arinsee" = "c_arinsee"))
+
+# Vérifier que la jointure a fonctionné
+PA_data |> st_drop_geometry() |>
+  select(l_aroff, taux_chomage, revenu_median, prix_m2_appart) |>
+  head(5)
+```
+
+```{r}
+#| label: ex3-answer
+#| code-fold: true
+#| code-summary: "Voir la réponse"
+
+PA_data <- left_join(PA, donnees,
+                     by = c("c_arinsee" = "c_arinsee"))
+
+PA_data |> st_drop_geometry() |>
+  select(l_aroff, taux_chomage, revenu_median, prix_m2_appart) |>
+  head(5) |>
+  knitr::kable(caption = "Extrait des données jointes")
+```
+
+------------------------------------------------------------------------
+
+## Cartographier les arrondissements {#sec-maps}
+
+### Exercice 4 — Carte de base
+
+Créez une carte de base des arrondissements avec leurs noms.
+
+```{r}
+#| label: ex4-question
+#| eval: false
+
+map_paris <- ggplot() +
+  geom_sf(data = ___, fill = "grey95", color = "white", linewidth = 0.5) +
+  geom_sf_text(data = ___, aes(label = ___),
+               fun.geometry = sf::st_centroid, size = 2.5, color = "grey30") +
+  labs(title = "Arrondissements de Paris") +
+  theme_void()
+map_paris
+```
+
+```{r}
+#| label: ex4-answer
+#| code-fold: true
+#| code-summary: "Voir la réponse"
+#| fig-cap: "Arrondissements de Paris avec numérotation"
+
+map_paris <- ggplot() +
+  geom_sf(data = PA_data, fill = "grey95", color = "white", linewidth = 0.5) +
+  geom_sf_text(data = PA_data, aes(label = c_arinsee),
+               fun.geometry = sf::st_centroid, size = 3, color = "grey30",
+               fontface = "bold") +
+  labs(title   = "Arrondissements de Paris",
+       caption = "Source : données Paris | Cours R-Carto") +
+  theme_void(base_size = 12) +
+  theme(plot.title = element_text(face = "bold", hjust = 0.5))
+map_paris
+```
+
+### Exercice 5 — Carte choroplèthe : prix au m²
+
+Cartographiez le prix moyen au m² par arrondissement avec une palette séquentielle.
+
+::: callout-tip
+## Indice
+
+La variable s'appelle `prix_m2_appart`. Choisissez une palette qui va du clair (prix faibles) au foncé (prix élevés) — pensez à `scale_fill_viridis_c()` ou `scale_fill_gradient()`.
+:::
+
+```{r}
+#| label: ex5-question
+#| eval: false
+
+ggplot(PA_data) +
+  geom_sf(aes(fill = ___), color = "white", linewidth = 0.4) +
+  scale_fill_viridis_c(
+    option = "___",
+    name   = "___",
+    labels = ___
+  ) +
+  labs(title = "___", caption = "___") +
+  theme_void()
+```
+
+```{r}
+#| label: ex5-answer
+#| code-fold: true
+#| code-summary: "Voir la réponse"
+#| fig-cap: "Prix moyen au m² par arrondissement parisien"
+
+ggplot(PA_data) +
+  geom_sf(aes(fill = prix_m2_appart), color = "white", linewidth = 0.4) +
+  scale_fill_viridis_c(
+    option = "plasma",
+    direction = -1,
+    name   = "Prix au m²\n(€)",
+    labels = label_comma(suffix = " €")
+  ) +
+  labs(
+    title    = "Prix moyen au m² par arrondissement",
+    subtitle = "Paris — données enrichies",
+    caption  = "Source : données Paris | Cours R-Carto"
+  ) +
+  theme_void(base_size = 12) +
+  theme(
+    plot.title      = element_text(face = "bold", hjust = 0.5),
+    plot.subtitle   = element_text(color = "grey40", hjust = 0.5),
+    legend.key.height = unit(1.5, "cm")
+  )
+```
+
+### Exercice 6 — Carte avec Jenks et fond Grand Paris
+
+Reprenez la variable `taux_chomage`, utilisez une classification de Jenks, et ajoutez le Grand Paris en fond de carte.
+
+```{r}
+#| label: ex6-question
+#| eval: false
+
+chomage_vec <- PA_data |> st_drop_geometry() |> pull(taux_chomage)
+breaks_j    <- classIntervals(chomage_vec, n = 5, style = "jenks")
+
+PA_data <- PA_data |>
+  mutate(classe_chomage = cut(taux_chomage,
+                               breaks = breaks_j$brks,
+                               include.lowest = TRUE,
+                               dig.lab = 3,
+                               ordered_result = TRUE))
+
+ggplot() +
+  geom_sf(data = ___, fill = "grey88", color = "grey70", linewidth = 0.3) + # fond Grand Paris
+  geom_sf(data = ___, aes(fill = ___), color = "white", linewidth = 0.5) +
+  scale_fill_brewer(palette = "___", name = "Taux de\nchômage (%)") +
+  labs(title = "___", caption = "___") +
+  theme_void()
+```
+
+```{r}
+#| label: ex6-answer
+#| code-fold: true
+#| code-summary: "Voir la réponse"
+#| fig-cap: "Taux de chômage par arrondissement (Jenks, n=5) sur fond Grand Paris"
+
+chomage_vec <- PA_data |> st_drop_geometry() |> pull(taux_chomage)
+breaks_j    <- classIntervals(chomage_vec, n = 5, style = "jenks")
+
+PA_data <- PA_data |>
+  mutate(classe_chomage = cut(taux_chomage,
+                               breaks = breaks_j$brks,
+                               include.lowest = TRUE,
+                               dig.lab = 3,
+                               ordered_result = TRUE))
+
+ggplot() +
+  geom_sf(data = GrandParis, fill = "grey88", color = "grey70", linewidth = 0.3) +
+  geom_sf(data = PA_data, aes(fill = classe_chomage),
+          color = "white", linewidth = 0.5) +
+  scale_fill_brewer(palette = "YlOrRd", name = "Taux de\nchômage (%)") +
+  labs(
+    title    = "Taux de chômage par arrondissement",
+    subtitle = "Classification de Jenks (n = 5) — fond Grand Paris",
+    caption  = "Source : données Paris | Cours R-Carto"
+  ) +
+  theme_void(base_size = 12) +
+  theme(
+    plot.title    = element_text(face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(color = "grey40", hjust = 0.5)
+  )
+```
+
+------------------------------------------------------------------------
+
+## Données Airbnb : jointure spatiale {#sec-airbnb}
+
+Le fichier `listings.csv` contient les annonces Airbnb parisiennes avec leurs coordonnées. Nous allons reproduire exactement la même chaîne d'opérations qu'avec les ventes immobilières à Londres.
+
+### Exercice 7 — Spatialiser les données Airbnb
+
+```{r}
+#| label: ex7-question
+#| eval: false
+
+airbnb <- read.csv("data/Paris/airbnb/listings.csv")
+names(airbnb)  # repérer les colonnes longitude et latitude
+
+# Créer l'objet sf (longitude = colonne 8, latitude = colonne 7)
+airbnb <- st_as_sf(airbnb, coords = c(___, ___))
+airbnb <- st_set_crs(airbnb, ___)            # WGS84
+airbnb <- st_transform(airbnb, st_crs(PA))   # reprojeter comme PA
+```
+
+```{r}
+#| label: ex7-answer
+#| code-fold: true
+#| code-summary: "Voir la réponse"
+#| fig-cap: "Points Airbnb superposés aux arrondissements"
+
+airbnb <- read.csv("data/Paris/airbnb/listings.csv")
+
+airbnb <- st_as_sf(airbnb, coords = c(8, 7)) |>
+  st_set_crs(4326) |>
+  st_transform(st_crs(PA))
+
+ggplot() +
+  geom_sf(data = PA,     fill = "grey95", color = "white", linewidth = 0.4) +
+  geom_sf(data = airbnb, color = "#d7191c", size = 0.3, alpha = 0.3) +
+  labs(
+    title    = "Annonces Airbnb à Paris",
+    subtitle = paste0(format(nrow(airbnb), big.mark = " "), " annonces"),
+    caption  = "Source : Inside Airbnb | Cours R-Carto"
+  ) +
+  theme_void(base_size = 12) +
+  theme(
+    plot.title    = element_text(face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(color = "grey40", hjust = 0.5)
+  )
+```
+
+### Exercice 8 — Filtrer, joindre et agréger
+
+Filtrez les annonces à moins de 200 €/nuit, faites la jointure spatiale, puis calculez le nombre d'annonces et le prix moyen par arrondissement.
+
+```{r}
+#| label: ex8-question
+#| eval: false
+
+# 1. Filtrer
+airbnb_filtre <- filter(airbnb, price < ___)
+
+# 2. Jointure spatiale
+airbnb_PA <- st_join(___, ___)
+
+# 3. Agréger
+airbnb_agg <- airbnb_PA |>
+  group_by(c_arinsee, l_aroff) |>
+  summarise(
+    nb_annonces = n(),
+    prix_moyen  = mean(___, na.rm = TRUE)
+  )
+
+head(airbnb_agg)
+```
+
+```{r}
+#| label: ex8-answer
+#| code-fold: true
+#| code-summary: "Voir la réponse"
+
+airbnb_filtre <- filter(airbnb, price < 200)
+
+# Jointure sur les arrondissements parisiens
+airbnb_PA <- st_join(PA, airbnb_filtre)
+
+# Jointure sur le Grand Paris (communes limitrophes)
+airbnb_GP <- st_join(GrandParis, airbnb_filtre)
+
+# Agréger — arrondissements
+airbnb_agg <- airbnb_PA |>
+  group_by(c_arinsee, l_aroff) |>
+  summarise(
+    nb_annonces = n(),
+    prix_moyen  = mean(price, na.rm = TRUE),
+    .groups     = "drop"
+  )
+
+# Agréger — Grand Paris
+airbnb_gp_agg <- airbnb_GP |>
+  group_by(C_DEP) |>
+  summarise(
+    nb_annonces = n(),
+    prix_moyen  = mean(price, na.rm = TRUE),
+    .groups     = "drop"
+  )
+
+airbnb_agg |> st_drop_geometry() |>
+  select(l_aroff, nb_annonces, prix_moyen) |>
+  arrange(desc(prix_moyen)) |>
+  head(8) |>
+  knitr::kable(digits = 0,
+               caption = "Arrondissements classés par prix Airbnb moyen")
+```
+
+### Exercice 9 — Carte finale Airbnb
+
+Cartographiez le prix moyen Airbnb avec les IRIS en fond de sous-quartiers.
+
+```{r}
+#| label: ex9-question
+#| eval: false
+
+iris <- read_sf("data/Paris/Polygons/iris.shp") |>
+  filter(dep == "75") |>
+  st_transform(2154)
+
+ggplot() +
+  geom_sf(data = ___, aes(fill = ___),
+          color = "white", linewidth = 0.5) +
+  scale_fill_viridis(___, direction = -1,
+                     labels = label_dollar(prefix = "€"),
+                     option = "___") +
+  geom_sf(data = iris, fill = NA,
+          color = alpha("white", 0.4), linewidth = 0.15) +
+  labs(title = "___", caption = "___") +
+  theme_void()
+```
+
+```{r}
+#| label: ex9-answer
+#| code-fold: true
+#| code-summary: "Voir la réponse"
+#| fig-cap: "Prix moyen Airbnb par arrondissement avec IRIS en fond"
+
+iris <- read_sf("data/Paris/Polygons/iris.shp") |>
+  filter(dep == "75") |>
+  st_transform(2154)
+
+# Harmoniser les plages de prix entre les deux couches
+prix_range <- range(c(airbnb_agg$prix_moyen, airbnb_gp_agg$prix_moyen),
+                    na.rm = TRUE)
+
+ggplot() +
+  # Grand Paris en fond avec sa propre valeur
+  geom_sf(data = airbnb_gp_agg, aes(fill = prix_moyen),
+          color = "white", linewidth = 0.3) +
+  # Arrondissements par-dessus
+  geom_sf(data = airbnb_agg, aes(fill = prix_moyen),
+          color = "white", linewidth = 0.5) +
+  scale_fill_viridis_c(
+    "Prix moyen\n(€/nuit)",
+    direction = -1,
+    limits    = prix_range,
+    labels    = label_dollar(prefix = "€"),
+    option    = "plasma"
+  ) +
+  # IRIS en filigrane sur Paris uniquement
+  geom_sf(data = iris, fill = NA,
+          color = alpha("white", 0.3), linewidth = 0.12) +
+  labs(
+    title    = "Prix moyen Airbnb — Paris et Grand Paris",
+    subtitle = "Annonces < 200 €/nuit | IRIS en filigrane sur Paris",
+    caption  = "Source : Inside Airbnb | Cours R-Carto"
+  ) +
+  theme_void(base_size = 12) +
+  theme(
+    plot.title        = element_text(face = "bold", hjust = 0.5),
+    plot.subtitle     = element_text(color = "grey40", hjust = 0.5),
+    legend.key.height = unit(1.5, "cm")
+  )
+```
+
+------------------------------------------------------------------------
+
+## Aller plus loin : grille hexagonale {#sec-grid}
+
+La grille hexagonale (*hexbin*) est une alternative aux polygones administratifs qui évite le biais lié à la taille des unités géographiques. Chaque cellule couvre exactement la même superficie.
+
+```{r}
+#| label: fig-hex-grid
+#| fig-cap: "Grille hexagonale de 500 m — nombre d'arbres plantés par cellule"
+
+arbresgeo <- read_sf("data/Paris/Points/les-arbres-plantes.shp") |>
+  st_transform(2154)
+
+# Créer la grille hexagonale (500 m)
+grille <- st_make_grid(
+  arbresgeo,
+  cellsize = 500,
+  crs      = 2154,
+  what     = "polygons",
+  square   = FALSE
+) |>
+  st_sf()
+
+grille <- grille |>
+  mutate(nb_arbres = lengths(st_intersects(grille, arbresgeo))) |>
+  filter(nb_arbres > 1)
+
+ggplot(grille) +
+  geom_sf(aes(fill = nb_arbres), color = NA) +
+  scale_fill_gradientn(
+    colors = c("#e8f5e9", "#66bb6a", "#2e7d32", "#1b3d08"),
+    name   = "Arbres\nplantés",
+    trans  = "sqrt"
+  ) +
+  # Contours des arrondissements pour se repérer
+  geom_sf(data = PA, fill = NA, color = "white", linewidth = 0.6) +
+  geom_sf_text(data = PA, aes(label = c_ar),
+               fun.geometry = sf::st_centroid,
+               size = 2.5, color = "white", fontface = "bold",
+               alpha = 0.9) +
+  labs(
+    title    = "Densité d'arbres plantés — Paris",
+    subtitle = "Grille hexagonale 500 m | contours des arrondissements",
+    caption  = "Source : Open Data Paris | Cours R-Carto"
+  ) +
+  theme_void(base_size = 12) +
+  theme(
+    plot.title    = element_text(face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(color = "grey40", hjust = 0.5),
+    legend.key.height = unit(1.5, "cm")
+  )
+```
+
+::: callout-note
+## Exercice bonus — Grille Airbnb
+
+Reproduisez la même carte hexagonale mais en comptant **le nombre d'annonces Airbnb** par cellule de 500 m. Remplacez `arbresgeo` par `airbnb_filtre` et adaptez la palette.
+
+```{r}
+#| eval: false
+
+grille_airbnb <- st_make_grid(
+  airbnb_filtre,
+  cellsize = 500,
+  crs      = 2154,
+  what     = "polygons",
+  square   = FALSE
+) |>
+  st_sf()
+
+grille_airbnb <- grille_airbnb |>
+  mutate(nb_annonces = lengths(st_intersects(grille_airbnb, airbnb_filtre))) |>
+  filter(nb_annonces > 0)
+
+ggplot(grille_airbnb) +
+  geom_sf(aes(fill = nb_annonces), color = NA) +
+  scale_fill_viridis_c(option = "inferno", name = "Annonces\nAirbnb",
+                       trans = "sqrt") +
+  geom_sf(data = PA, fill = NA, color = "white", linewidth = 0.5) +
+  geom_sf_text(data = PA, aes(label = c_ar),
+               fun.geometry = sf::st_centroid,
+               size = 2.5, color = "white", fontface = "bold") +
+  labs(title    = "Densité d'annonces Airbnb — grille hexagonale 500 m",
+       subtitle = "Contours des arrondissements en filigrane") +
+  theme_void()
+```
+:::
+
+------------------------------------------------------------------------
+
+## Exporter vos cartes {#sec-export}
+
+Une fois satisfait du résultat, exportez avec `ggsave()` :
+
+```{r}
+#| label: export
+#| eval: false
+
+dir.create("maps", showWarnings = FALSE)
+
+# PNG haute résolution pour présentation
+ggsave("maps/paris_prix_airbnb.png",
+       width = 20, height = 20, units = "cm", dpi = 300)
+
+# PDF vectoriel pour publication
+ggsave("maps/paris_prix_airbnb.pdf",
+       width = 20, height = 20, units = "cm")
+```
+
+::: callout-tip
+## Paramètres `ggsave()` utiles
+
+| Paramètre         | Usage                                                |
+|-------------------|------------------------------------------------------|
+| `width`, `height` | Dimensions (défaut : pouces, ou préciser `units`)    |
+| `dpi`             | Résolution — 300 pour impression, 150 pour web       |
+| `device`          | `"png"`, `"pdf"`, `"svg"`                            |
+| `plot`            | Objet ggplot à sauvegarder (dernier plot par défaut) |
+
+Documentation complète : [ggplot2.tidyverse.org/reference/ggsave](https://ggplot2.tidyverse.org/reference/ggsave.html)
+:::
+
+------------------------------------------------------------------------
+
+## Récapitulatif {#sec-summary}
+
+::: callout-note
+## Ce que vous avez pratiqué
+
+| Opération | Fonction | Données |
+|--------------------------|------------------------|----------------------|
+| Charger shapefile | `read_sf()` | Arrondissements, IRIS |
+| Reprojeter | `st_transform(x, 2154)` | Lambert-93 France |
+| Jointure attributaire | `left_join()` | Données socio-économiques |
+| Spatialiser un CSV | `st_as_sf()` | Airbnb |
+| Jointure spatiale | `st_join(polygones, points)` | Airbnb × arrondissements |
+| Agréger | `group_by() \|> summarise()` | Prix moyen par arrondissement |
+| Grille hexagonale | `st_make_grid(..., square = FALSE)` | Arbres, Airbnb |
+| Exporter | `ggsave()` | PNG, PDF |
+:::
+
+------------------------------------------------------------------------
+
+> **← Précédent : [Géotraitement — Londres](geoprocessing_Londres.qmd)** **→ Suivant : Calculs d'Indices Topographiques**
+
+------------------------------------------------------------------------
+
+*Dr. Elisabetta Pietrostefani — Directrice Adjointe, Geographic Data Science Lab — Université de Liverpool \| Co-Directrice, [Imago : Data Service for Imagery](https://imago.ac.uk/) \| Chercheuse Associée, London School of Economics*

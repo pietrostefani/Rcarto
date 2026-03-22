@@ -1,0 +1,538 @@
+---
+title: "Données Spatiales et Simple Features"
+author: "Dr. Elisabetta Pietrostefani"
+date: today
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    toc-title: "Table des matières"
+    number-sections: true
+    code-fold: show
+    code-tools: true
+    theme: cosmo
+    highlight-style: github
+    embed-resources: true
+    fig-align: center
+    fig-width: 8
+    fig-height: 6
+execute:
+  warning: false
+  message: false
+  echo: true
+---
+
+## Contexte : pourquoi R pour la cartographie ? {#sec-context}
+
+R est un environnement open source **conçu pour l'analyse de données et les graphiques**, qui s'exécute sur toutes les plateformes. Choisir R pour la cartographie, c'est réunir dans un seul outil :
+
+-   la **manipulation des données** (nettoyage, jointures, agrégation)
+-   l'**analyse statistique** (modèles, tests)
+-   la **visualisation** (cartes statiques, interactives, graphiques)
+-   la **reproductibilité** (scripts, Quarto, Git)
+
+Contrairement aux logiciels SIG à interface graphique (QGIS, ArcGIS), R encourage une approche **en ligne de commande** qui rend chaque étape de l'analyse traçable et reproductible.
+
+::: callout-tip
+## Citation de référence
+
+*"Les données ne sont pas que des chiffres, ce sont des chiffres avec un contexte"* — Cobb & Moore
+:::
+
+------------------------------------------------------------------------
+
+## Installation des packages {#sec-packages}
+
+```{r}
+#| label: setup
+#| message: false
+
+# Packages principaux pour ce chapitre
+library(sf)        # Simple Features — données vectorielles
+library(spData)    # jeux de données géographiques
+library(ggplot2)   # visualisation
+library(dplyr)     # manipulation de données
+library(leaflet)   # cartes interactives
+library(maps)      # données cartographiques de base
+library(stars)     # données raster (optionnel)
+```
+
+::: {.callout-note collapse="true"}
+## Installer les packages pour la première fois
+
+```{r}
+#| eval: false
+
+install.packages(c("sf", "spData", "ggplot2", "dplyr",
+                   "leaflet", "maps", "stars", "terra"))
+```
+:::
+
+------------------------------------------------------------------------
+
+## Toutes les données sont spatiales {#sec-spatial}
+
+**Toutes les données sont spatiales** — les données proviennent de l'observation, et l'observation doit avoir lieu *quelque part* et à *un certain moment*.
+
+Pour beaucoup de données, la localisation est secondaire : l'emplacement d'un scanner cérébral n'est pas pertinent pour le diagnostic. Mais pour d'autres — cartographie épidémique, transport, urbanisme, environnement — **la position dans l'espace est la variable principale**.
+
+### Un premier exemple interactif
+
+```{r}
+#| label: fig-leaflet
+#| fig-cap: "Carte interactive : villes d'origine des participants (données fictives)"
+
+popup <- c("Clémence", "Baptiste", "Nathalie", "Daphné",
+           "Fannie", "Gabrielle", "Yann", "Cédric", "Soilihi")
+
+leaflet() |>
+  addProviderTiles("NASAGIBS.ViirsEarthAtNight2012") |>
+  addMarkers(
+    lng = c(-1.5536, -0.5792, 5.4474, -4.4861, -2.0257,
+             3.0870,  2.3522,  4.4861,  2.0257),
+    lat = c(47.2184, 44.8378, 43.5297, 48.3904, 48.6493,
+            45.7772, 48.8566, 48.3904, 48.6493),
+    popup = popup
+  )
+```
+
+::: callout-note
+## Exercice 1
+
+Modifiez la carte ci-dessus pour ajouter votre propre ville. Trouvez les coordonnées sur [latlong.net](https://www.latlong.net/).
+:::
+
+------------------------------------------------------------------------
+
+## Représenter des données spatiales dans R {#sec-represent}
+
+Les trois types d'objets spatiaux fondamentaux sont les **points**, les **polygones** 
+et les **rasters**. Voyons chacun avec un exemple concret, en utilisant `ggplot2` 
+— la même syntaxe que vous utiliserez tout au long du cours.
+
+### 1. Points — des lieux précis
+
+Un point est défini par une paire de coordonnées (longitude, latitude). C'est la 
+représentation la plus simple : une ville, une station de mesure, une adresse.
+```{r}
+#| label: fig-points
+#| fig-cap: "Points : cinq capitales européennes"
+#| fig-height: 5
+
+cities <- data.frame(
+  nom = c("Paris", "Londres", "Berlin", "Madrid", "Rome"),
+  lon = c(2.35,  -0.12,  13.40,  -3.70,  12.50),
+  lat = c(48.85,  51.51,  52.52,  40.42,  41.90)
+) |>
+  st_as_sf(coords = c("lon", "lat"), crs = 4326)
+
+ggplot() +
+  geom_sf(data = world[world$continent == "Europe", ],
+          fill = "grey90", color = "white", linewidth = 0.3) +
+  geom_sf(data = cities, color = "#d7191c", size = 3) +
+  geom_sf_label(data = cities, aes(label = nom),
+                size = 3, nudge_y = 1.2, label.size = 0) +
+  coord_sf(xlim = c(-10, 25), ylim = c(36, 58)) +
+  labs(
+    title   = "Points : capitales européennes",
+    caption = "Cours R-Carto"
+  ) +
+  theme_void(base_size = 12) +
+  theme(plot.title = element_text(face = "bold", hjust = 0.5))
+```
+
+::: {.callout-note}
+## Exercice 2
+
+Ajoutez une ville de votre choix au data frame `cities`. 
+Trouvez ses coordonnées sur [latlong.net](https://www.latlong.net/).
+:::
+
+### 2. Polygones — des surfaces
+
+Un polygone est une séquence de points formant une surface fermée : commune, 
+département, région, pays. Les polygones portent une **table attributaire** — 
+c'est ce qui permet de les colorer selon une variable.
+```{r}
+#| label: fig-polygons
+#| fig-cap: "Polygones : PIB par habitant par pays en Europe"
+#| fig-height: 6
+
+europe <- world[world$continent == "Europe", ]
+
+ggplot(europe) +
+  geom_sf(aes(fill = gdpPercap), color = "white", linewidth = 0.3) +
+  scale_fill_viridis_c(
+    option   = "plasma",
+    name     = "PIB/hab (USD)",
+    na.value = "grey80",
+    labels   = scales::label_comma()
+  ) +
+  coord_sf(xlim = c(-10, 40), ylim = c(34, 72)) +
+  labs(
+    title   = "Polygones : PIB par habitant en Europe",
+    caption = "Source : spData | Cours R-Carto"
+  ) +
+  theme_void(base_size = 12) +
+  theme(
+    plot.title        = element_text(face = "bold", hjust = 0.5),
+    legend.key.height = unit(1.2, "cm")
+  )
+```
+
+### 3. Raster — des grilles de valeurs
+
+Un raster divise l'espace en une grille régulière de pixels, chacun portant 
+une valeur numérique. C'est le format naturel pour les **phénomènes continus** 
+comme l'altitude, la température ou l'occupation du sol.
+
+Le jeu de données `volcano` intégré à R représente le **Maungawhau** — un volcan 
+éteint situé à Auckland, Nouvelle-Zélande — sous forme d'une matrice 
+d'altitudes de 87 × 61 cellules.
+```{r}
+#| label: fig-raster
+#| fig-cap: "Raster : Modèle Numérique d'Élévation du volcan Maungawhau, Auckland (NZ)"
+#| fig-height: 5
+
+volcano_df <- expand.grid(
+  x = 1:ncol(volcano),
+  y = 1:nrow(volcano)
+)
+volcano_df$altitude <- as.vector(t(volcano))
+
+ggplot(volcano_df, aes(x = x, y = y, fill = altitude)) +
+  geom_raster() +
+  scale_fill_gradientn(
+    colors = hcl.colors(50, "Terrain"),
+    name   = "Altitude (m)"
+  ) +
+  coord_equal() +
+  labs(
+    title    = "Raster : Maungawhau — Auckland, Nouvelle-Zélande",
+    subtitle = "Chaque pixel = une cellule de la matrice d'altitudes",
+    caption  = "Source : dataset volcano (base R) | Cours R-Carto"
+  ) +
+  theme_void(base_size = 12) +
+  theme(
+    plot.title    = element_text(face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(color = "grey40", hjust = 0.5)
+  )
+```
+------------------------------------------------------------------------
+
+## Simple Features (`sf`) {#sec-sf}
+
+`sf` (*Simple Features*) est le standard pour les données vectorielles dans R. Il est développé et approuvé par l'**Open Geospatial Consortium (OGC)** et stocke les géométries dans une colonne spéciale d'un data frame ordinaire.
+
+### Les 7 types de géométrie essentiels
+
+```{r}
+#| label: fig-geometries
+#| fig-cap: "Les trois types de géométrie fondamentaux dans sf"
+#| fig-height: 3
+#| fig-width: 9
+
+old_par <- par(mfrow = c(1, 3), pty = "s", mar = c(1, 2, 2, 1))
+
+plot(st_as_sfc("POINT(5 2)"),
+     axes = TRUE, main = "POINT", col = "#2c7bb6", pch = 19, cex = 2)
+
+plot(st_as_sfc("LINESTRING(1 5, 4 4, 4 1, 2 2, 3 2)"),
+     axes = TRUE, main = "LINESTRING", col = "#d7191c", lwd = 2)
+
+plot(st_as_sfc("POLYGON((1 5, 2 2, 4 1, 4 4, 1 5))"),
+     col = "#ffffbf", border = "#2c3e50", axes = TRUE, main = "POLYGON")
+
+par(old_par)
+```
+
+**Syntaxe WKT (*Well-Known Text*) :**
+
+| Type | Exemple WKT |
+|-----------------------|-------------------------------------------------|
+| Point | `POINT (5 2)` |
+| Ligne | `LINESTRING (1 5, 4 4, 4 1, 2 2, 3 2)` |
+| Polygone | `POLYGON ((1 5, 2 2, 4 1, 4 4, 1 5))` |
+| Polygone avec trou | `POLYGON ((1 5, 2 2, 4 1, 4 4, 1 5), (2 4, 3 4, 3 3, 2 3, 2 4))` |
+| Multi-polygone | `MULTIPOLYGON (((0 0,1 0,1 1,0 0)), ((3 3,4 3,4 4,3 3)))` |
+
+### Explorer un objet `sf` : le monde
+
+```{r}
+#| label: world-explore
+
+# Le dataset 'world' est un objet sf fourni par spData
+class(world)
+names(world)
+```
+
+```{r}
+#| label: fig-world-gdp
+#| fig-cap: "PIB par habitant dans le monde avec ggplot2"
+
+ggplot() +
+  geom_sf(data = world, aes(fill = gdpPercap)) +
+  scale_fill_viridis_c(
+    option = "plasma",
+    name   = "PIB/hab (USD)",
+    na.value = "grey80"
+  ) +
+  labs(
+    title   = "PIB par habitant dans le monde",
+    caption = "Source : spData | Cours R-Carto"
+  ) +
+  theme_void(base_size = 12) +
+  theme(plot.title = element_text(face = "bold", hjust = 0.5))
+```
+
+### Filtrer et superposer
+
+```{r}
+#| label: fig-africa
+#| fig-cap: "Afrique mise en évidence sur la carte du monde"
+
+world_africa <- world[world$continent == "Africa", ]
+africa       <- st_union(world_africa)
+
+ggplot() +
+  geom_sf(data = world, fill = "grey90", color = "white", linewidth = 0.2) +
+  geom_sf(data = africa, fill = "#d7191c", color = "white", linewidth = 0.3) +
+  labs(
+    title   = "Le continent africain",
+    caption = "Source : spData | Cours R-Carto"
+  ) +
+  theme_void(base_size = 12) +
+  theme(plot.title = element_text(face = "bold", hjust = 0.5))
+```
+
+```{r}
+#| label: fig-kenya
+#| fig-cap: "Le Kenya en contexte africain"
+
+kenya <- world[world$name_long == "Kenya", ]
+
+ggplot() +
+  geom_sf(data = world_africa, fill = "grey85", color = "white", linewidth = 0.3) +
+  geom_sf(data = kenya, fill = "#2c7bb6", color = "white", linewidth = 0.5) +
+  labs(
+    title   = "Le Kenya en Afrique",
+    caption = "Source : spData | Cours R-Carto"
+  ) +
+  theme_void(base_size = 12) +
+  theme(plot.title = element_text(face = "bold", hjust = 0.5))
+```
+
+::: callout-note
+## Exercice 3
+
+Adaptez le code ci-dessus pour mettre en évidence un autre pays de votre choix sur son continent.
+:::
+
+------------------------------------------------------------------------
+
+## Application : Cartes de Londres {#sec-london}
+
+Nous travaillons maintenant avec de vraies données : les districts londoniens et des données de qualification tirées du recensement.
+
+### Charger les données
+
+```{r}
+#| label: load-london
+
+# Charger le shapefile des districts londoniens
+districts <- read_sf("data/London/Polygons/districts.shp")
+
+# Aperçu de la structure
+head(districts)
+```
+
+### Carte de base
+
+```{r}
+#| label: fig-london-base
+#| fig-cap: "Districts londoniens — carte de base"
+
+ggplot(districts) +
+  geom_sf(fill = "lightgrey", color = "white", linewidth = 0.4) +
+  labs(
+    title   = "Districts de Londres",
+    caption = "Source : données Londres | Cours R-Carto"
+  ) +
+  theme_void(base_size = 12) +
+  theme(plot.title = element_text(face = "bold", hjust = 0.5))
+```
+
+### Indexation et sélection
+
+```{r}
+#| label: indexing
+#| eval: false
+
+# Indexation par position
+districts[1, ]      # première ligne
+districts[, 1]      # première colonne
+districts[1, 1]     # cellule [1,1]
+
+# Accès à une colonne par son nom
+districts$DIST_NAME
+
+# Filtrage conditionnel
+districts[districts$DIST_NAME == "Hackney", ]
+```
+
+```{r}
+#| label: fig-hackney
+#| fig-cap: "Hackney mis en évidence parmi les districts londoniens"
+
+hackney <- districts |> filter(DIST_NAME == "Hackney")
+
+ggplot() +
+  geom_sf(data = districts, fill = "lightgrey", color = "white", linewidth = 0.3) +
+  geom_sf(data = hackney,   fill = "#2c7bb6",   color = "white", linewidth = 0.6) +
+  labs(
+    title   = "Hackney parmi les districts de Londres",
+    caption = "Source : données Londres | Cours R-Carto"
+  ) +
+  theme_void(base_size = 12) +
+  theme(plot.title = element_text(face = "bold", hjust = 0.5))
+```
+
+::: callout-note
+## Exercice 4
+
+Modifiez le code ci-dessus pour mettre en évidence un autre district de votre choix (ex. `"Islington"`, `"Tower Hamlets"`, `"Southwark"`).
+:::
+
+### Joindre des données attributaires
+
+```{r}
+#| label: join-data
+
+# Importer les données de qualification du recensement 2001
+qualifications2001_df <- read.csv("data/London/Tables/qualifications2001_2.csv")
+head(qualifications2001_df)
+```
+
+```{r}
+#| label: left-join
+
+# Jointure : shapefile districts + données CSV
+# La clé commune : DIST_CODE (districts) = Zone_Code (qualifications)
+districts <- left_join(
+  districts,
+  qualifications2001_df,
+  by = c("DIST_CODE" = "Zone_Code")
+)
+
+# Créer la variable : part de personnes avec qualification niveau 4+
+districts <- districts |>
+  mutate(Level4p = Level4 / Population1674)
+
+head(districts |> st_drop_geometry() |> select(DIST_NAME, Level4, Population1674, Level4p))
+```
+
+::: callout-tip
+## Les types de jointure en `dplyr`
+
+| Fonction           | Résultat                                             |
+|--------------------------------------|----------------------------------|
+| `left_join(x, y)`  | Toutes les lignes de x, colonnes de x et y           |
+| `inner_join(x, y)` | Seulement les lignes avec correspondance dans x et y |
+| `right_join(x, y)` | Toutes les lignes de y, colonnes de x et y           |
+| `full_join(x, y)`  | Toutes les lignes de x et y                          |
+:::
+
+### Carte choroplèthe : niveau d'éducation
+
+```{r}
+#| label: fig-education
+#| fig-cap: "Part de la population avec qualification de niveau 4+ par district londonien"
+#| fig-height: 7
+
+ggplot(districts) +
+  geom_sf(aes(fill = Level4p), color = "white", linewidth = 0.3) +
+  scale_fill_viridis_c(
+    option  = "viridis",
+    name    = "Part niveau 4+",
+    labels  = scales::label_percent()
+  ) +
+  labs(
+    title    = "Niveau d'éducation (qualification niveau 4+)",
+    subtitle = "Districts londoniens — Recensement 2001",
+    caption  = "Source : données Londres | Cours R-Carto"
+  ) +
+  theme_void(base_size = 12) +
+  theme(
+    plot.title    = element_text(face = "bold", size = 14, hjust = 0.5),
+    plot.subtitle = element_text(color = "grey40", hjust = 0.5),
+    legend.key.height = unit(1.2, "cm")
+  )
+```
+
+### Nuage de points : population vs éducation
+
+```{r}
+#| label: fig-scatter
+#| fig-cap: "Relation entre population et niveau d'éducation par district"
+#| fig-height: 6
+
+ggplot(districts,
+       aes(x = Population1674, y = Level4p)) +
+  geom_point(aes(color = Level4p, size = Population1674), alpha = 0.8) +
+  geom_text(
+    aes(label = DIST_NAME, color = Level4p),
+    size = 2.5, check_overlap = TRUE,
+    nudge_x = 15000, nudge_y = 0.015
+  ) +
+  scale_color_viridis_c(option = "plasma", guide = "none") +
+  scale_size_continuous(
+    name   = "Population",
+    range  = c(2, 8),
+    labels = scales::label_comma()
+  ) +
+  scale_x_continuous(
+    name   = "Population (16–74 ans)",
+    labels = scales::label_comma()
+  ) +
+  scale_y_continuous(
+    name   = "Part qualification niveau 4+",
+    labels = scales::label_percent()
+  ) +
+  labs(
+    title   = "Population et niveau d'éducation — Districts londoniens",
+    caption = "Source : Recensement 2001 | Cours R-Carto"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(plot.title = element_text(face = "bold", hjust = 0.5))
+```
+
+::: callout-note
+## Exercice 5
+
+**À vous de jouer !** Créez une carte similaire pour Paris avec des données de votre choix. Étapes : 
+
+1. Charger un shapefile des arrondissements ou communes de Paris 
+
+2. Charger un fichier CSV avec une variable socio-économique (INSEE) 
+
+3. Faire la jointure avec `left_join()` 
+
+4. Créer la carte avec `ggplot2 + geom_sf()`
+:::
+
+------------------------------------------------------------------------
+
+## Liens utiles {#sec-links}
+
+-   [Geocomputation with R](https://geocompr.robinlovelace.net) — référence principale
+-   [r-spatial.org](https://r-spatial.org/book/03-Geometries.html) — géométries sf
+-   [sf package documentation](https://r-spatial.github.io/sf/)
+-   [ggplot2 + sf](https://ggplot2.tidyverse.org/reference/ggsf.html)
+
+------------------------------------------------------------------------
+
+> **← Introduction : [Pourquoi les SIG ?](introduction.qmd)** **→ Suite : [Systèmes de Coordonnées et Rasters](1_2_R_pourlacartographie.qmd)**
+
+------------------------------------------------------------------------
+
+*Dr. Elisabetta Pietrostefani — Directrice Adjointe, Geographic Data Science Lab — Université de Liverpool \| Co-Directrice, [Imago : Data Service for Imagery](https://imago.ac.uk/) \| Chercheuse Associée, London School of Economics*

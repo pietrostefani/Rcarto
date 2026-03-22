@@ -1,0 +1,405 @@
+---
+title: "Données Raster"
+author: "Dr. Elisabetta Pietrostefani"
+date: today
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    toc-title: "Table des matières"
+    number-sections: true
+    code-fold: show
+    code-tools: true
+    theme: cosmo
+    highlight-style: github
+    embed-resources: true
+    fig-align: center
+    fig-width: 8
+    fig-height: 6
+execute:
+  warning: false
+  message: false
+  echo: true
+---
+
+## Vecteur vs Raster {#sec-intro}
+
+Jusqu'ici nous avons travaillé avec des données **vectorielles** : des points, des lignes et des polygones avec des frontières nettes. Mais de nombreux phénomènes géographiques — l'altitude, la température, la végétation, la pollution — sont **continus dans l'espace** et ne s'arrêtent pas aux frontières administratives.
+
+C'est là qu'intervient le **raster**.
+
+|   | Vecteur | Raster |
+|------------------------|------------------------|------------------------|
+| **Structure** | Points, lignes, polygones | Grille régulière de pixels |
+| **Adapté pour** | Entités discrètes (communes, routes) | Phénomènes continus (altitude, T°) |
+| **Format de fichier** | `.shp`, `.gpkg`, `.geojson` | `.tif`, `.img`, `.nc` |
+| **Package R principal** | `sf` | `terra`, `stars` |
+| **Résolution** | Exacte (coordonnées précises) | Dépend de la taille du pixel |
+
+```{r}
+#| label: setup
+#| message: false
+
+library(sf)
+library(ggplot2)
+library(dplyr)
+library(stars)
+library(terra)
+```
+
+------------------------------------------------------------------------
+
+## Qu'est-ce qu'un raster ? {#sec-what}
+
+Un raster est une **grille régulière de cellules (pixels)**, chacune portant une valeur numérique. C'est exactement la même structure qu'une photographie numérique — sauf que chaque pixel correspond à une zone précise sur la surface terrestre.
+
+```{r}
+#| label: fig-raster-concept
+#| fig-cap: "Un raster est une matrice de valeurs — ici l'altitude du volcan Maungawhau (Auckland, NZ)"
+#| fig-height: 5
+
+# Le dataset volcano (base R) est une matrice 87 x 61 d'altitudes
+cat("Classe :", class(volcano), "\n")
+cat("Dimensions :", nrow(volcano), "lignes ×", ncol(volcano), "colonnes\n")
+cat("Valeurs — aperçu des 3 premières lignes :\n")
+print(volcano[1:3, 1:5])
+```
+
+```{r}
+#| label: fig-volcano-map
+#| fig-cap: "Modèle Numérique d'Élévation — Maungawhau, Auckland (Nouvelle-Zélande). Chaque cellule de la matrice devient un pixel coloré selon son altitude."
+#| fig-height: 5
+
+# Convertir la matrice en data frame pour ggplot2
+volcano_df <- expand.grid(x = 1:ncol(volcano), y = 1:nrow(volcano))
+volcano_df$altitude <- as.vector(t(volcano))
+
+ggplot(volcano_df, aes(x = x, y = y, fill = altitude)) +
+  geom_raster() +
+  scale_fill_gradientn(
+    colors = hcl.colors(50, "Terrain"),
+    name   = "Altitude (m)"
+  ) +
+  coord_equal() +
+  labs(
+    title    = "MNT — Volcan Maungawhau, Auckland (NZ)",
+    subtitle = paste0("Grille de ", nrow(volcano), " × ", ncol(volcano),
+                      " cellules | Altitude : ",
+                      min(volcano), "–", max(volcano), " m"),
+    caption  = "Source : dataset volcano (base R) | Cours R-Carto"
+  ) +
+  theme_void(base_size = 12) +
+  theme(
+    plot.title    = element_text(face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(color = "grey40", hjust = 0.5, size = 9),
+    plot.caption  = element_text(color = "grey55", size = 8)
+  )
+```
+
+**Trois propriétés définissent un raster géographique :**
+
+-   **Emprise** (*extent*) — la zone couverte (xmin, xmax, ymin, ymax)
+-   **Résolution** — la taille d'un pixel (ex. 30m × 30m pour Landsat)
+-   **SCR** — le système de coordonnées de référence
+
+------------------------------------------------------------------------
+
+## Le package `stars` — images satellitaires {#sec-stars}
+
+`stars` est conçu pour les données **spatio-temporelles** multidimensionnelles : images satellitaires multibandes, séries temporelles de rasters, données climatiques.
+
+### Charger et explorer une image Landsat
+
+```{r}
+#| label: stars-load
+
+# Image Landsat 7 ETM+ — Olinda, Brésil
+# 6 bandes spectrales : visible (B1-B3), proche infrarouge (B4), SWIR (B5-B6)
+L7 <- read_stars(system.file("tif/L7_ETMs.tif", package = "stars"))
+
+# Structure de l'objet
+L7
+```
+
+```{r}
+#| label: stars-info
+
+# Dimensions et attributs
+dim(L7)          # lignes × colonnes × bandes
+st_crs(L7)$srid  # SCR
+st_bbox(L7)      # emprise géographique
+```
+
+### Visualiser les 6 bandes
+
+```{r}
+#| label: fig-stars-bands
+#| fig-cap: "Image Landsat 7 — 6 bandes spectrales. Les bandes 1-3 correspondent au visible (bleu, vert, rouge), la bande 4 au proche infrarouge (végétation), les bandes 5-6 à l'infrarouge moyen."
+#| fig-height: 6
+
+ggplot() +
+  geom_stars(data = L7) +
+  facet_wrap(
+    ~band,
+    labeller = labeller(band = c("1" = "B1 — Bleu",   "2" = "B2 — Vert",
+                                  "3" = "B3 — Rouge",  "4" = "B4 — PIR",
+                                  "5" = "B5 — SWIR1",  "6" = "B6 — SWIR2"))
+  ) +
+  scale_fill_viridis_c(
+    option   = "inferno",
+    name     = "Réflectance",
+    na.value = "white"
+  ) +
+  coord_equal() +
+  labs(
+    title   = "Landsat 7 ETM+ — Olinda, Brésil",
+    caption = "Source : package stars | Cours R-Carto"
+  ) +
+  theme_void(base_size = 10) +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    strip.text = element_text(face = "bold", size = 8)
+  )
+```
+
+### Extraire une seule bande
+
+```{r}
+#| label: fig-single-band
+#| fig-cap: "Bande 4 (Proche Infrarouge) — la végétation apparaît en clair car elle réfléchit fortement le PIR"
+#| fig-height: 5
+
+L7_b4 <- L7[,,,4]   # sélectionner la bande 4
+
+ggplot() +
+  geom_stars(data = L7_b4) +
+  scale_fill_viridis_c(option = "viridis", name = "PIR", na.value = "white") +
+  coord_equal() +
+  labs(
+    title    = "Bande 4 — Proche Infrarouge (PIR)",
+    subtitle = "Valeurs élevées = végétation dense",
+    caption  = "Source : Landsat 7 | Cours R-Carto"
+  ) +
+  theme_void(base_size = 12) +
+  theme(
+    plot.title    = element_text(face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(color = "grey40", hjust = 0.5)
+  )
+```
+
+------------------------------------------------------------------------
+
+## Le package `terra` — modèles numériques de terrain {#sec-terra}
+
+`terra` est optimisé pour les opérations rapides sur des rasters simples : modèles numériques de terrain (MNT), reclassification, algèbre raster.
+
+::: callout-note
+## Installation de `spDataLarge`
+
+Les exemples `terra` ci-dessous utilisent le package `spDataLarge` qui contient des données plus volumineuses. À installer une fois en local :
+
+```{r}
+#| eval: false
+
+install.packages("spDataLarge",
+                 repos = "https://geocompr.r-universe.dev")
+```
+:::
+
+### Charger un MNT SRTM
+
+```{r}
+#| label: terra-load
+#| eval: false
+
+library(spDataLarge)
+
+# Modèle numérique d'élévation SRTM — Parc National de Zion, Utah (USA)
+raster_filepath <- system.file("raster/srtm.tif", package = "spDataLarge")
+srtm <- rast(raster_filepath)
+
+# Informations essentielles
+srtm                   # résumé complet
+crs(srtm)              # SCR
+res(srtm)              # résolution (en degrés ici)
+ext(srtm)              # emprise (xmin, xmax, ymin, ymax)
+nlyr(srtm)             # nombre de couches
+global(srtm, "range")  # min / max des valeurs
+```
+
+### Visualiser avec `tidyterra` + `ggplot2`
+
+```{r}
+#| label: fig-terra-ggplot
+#| eval: false
+
+library(tidyterra)
+
+ggplot() +
+  geom_spatraster(data = srtm) +
+  scale_fill_gradientn(
+    colors   = hcl.colors(50, "Terrain"),
+    name     = "Altitude (m)",
+    na.value = "white"
+  ) +
+  labs(
+    title   = "MNT SRTM — Parc National de Zion (Utah)",
+    caption = "Source : spDataLarge | Cours R-Carto"
+  ) +
+  theme_void(base_size = 12) +
+  theme(plot.title = element_text(face = "bold", hjust = 0.5))
+```
+
+### Raster multi-couches
+
+```{r}
+#| label: terra-multilayer
+#| eval: false
+
+# Image Landsat multibande avec terra
+multi_rast_file <- system.file("raster/landsat.tif", package = "spDataLarge")
+multi_rast      <- rast(multi_rast_file)
+
+multi_rast          # 4 couches (bandes)
+nlyr(multi_rast)    # nombre de couches
+names(multi_rast)   # noms des couches
+```
+
+------------------------------------------------------------------------
+
+## SCR et rasters {#sec-raster-crs}
+
+Les rasters ont aussi un SCR. Les fonctions sont légèrement différentes de `sf` :
+
+```{r}
+#| label: raster-crs
+#| eval: false
+
+# Lire le SCR d'un raster terra
+crs(srtm)
+
+# Définir un SCR manquant (ne modifie pas les valeurs)
+crs(srtm) <- "EPSG:4326"
+
+# Reprojeter (réinterpolation des valeurs — plus coûteux qu'un vecteur)
+srtm_lambert <- project(srtm, "EPSG:2154")
+```
+
+::: callout-warning
+## Reprojeter un raster ≠ reprojeter un vecteur
+
+Reprojeter un vecteur = transformer des coordonnées. Rapide, sans perte.
+
+Reprojeter un raster = **réinterpoler** les valeurs de chaque cellule dans une nouvelle grille. Plus lent et peut introduire de légères imprécisions. Travaillez toujours dans le SCR natif le plus longtemps possible, et ne reprojetez qu'en dernier recours.
+:::
+
+------------------------------------------------------------------------
+
+## `stars` vs `terra` : lequel choisir ? {#sec-comparison}
+
+::: callout-tip
+## Règle pratique
+
+| Situation | Package recommandé |
+|---------------------------|---------------------------------------------|
+| Modèle numérique de terrain (MNT) | `terra` |
+| Calculs raster rapides (reclassification, algèbre) | `terra` |
+| Image satellitaire multibande | `stars` ou `terra` |
+| Données spatio-temporelles (séries de rasters) | `stars` |
+| Intégration avec `ggplot2` sans package extra | `stars` (`geom_stars()`) |
+| Intégration avec `ggplot2` via `tidyterra` | `terra` (`geom_spatraster()`) |
+
+En pratique, les deux packages interopèrent : `st_as_stars(terra_obj)` et `rast(stars_obj)` permettent de convertir facilement de l'un à l'autre.
+:::
+
+------------------------------------------------------------------------
+
+## Exercices {#sec-exercises}
+
+::: callout-note
+## Exercice 1 — Explorer le raster volcano
+
+En utilisant le data frame `volcano_df` créé dans ce chapitre :
+
+1.  Calculez l'altitude moyenne, minimale et maximale du volcan
+2.  Créez une carte qui ne montre que les zones au-dessus de **160 m** (astuce : utilisez `mutate()` et `na_if()` ou `if_else()`)
+3.  Changez la palette de couleurs — essayez `"YlOrRd"` ou `"RdBu"` dans `scale_fill_gradientn()`
+
+```{r}
+#| eval: false
+
+volcano_df <- expand.grid(x = 1:ncol(volcano), y = 1:nrow(volcano))
+volcano_df$altitude <- as.vector(t(volcano))
+
+# 1. Statistiques
+summary(volcano_df$altitude)
+
+# 2. Filtrer les zones > 160 m
+volcano_hautes <- volcano_df |>
+  mutate(altitude_filtre = if_else(altitude > 160, altitude, NA_real_))
+
+ggplot(volcano_hautes, aes(x = x, y = y, fill = altitude_filtre)) +
+  geom_raster() +
+  scale_fill_gradientn(colors = hcl.colors(20, "..."), na.value = "grey90") +
+  coord_equal() +
+  theme_void()
+```
+:::
+
+::: callout-note
+## Exercice 2 — Landsat et indices spectraux (avancé)
+
+L'indice NDVI (*Normalized Difference Vegetation Index*) mesure la densité de végétation à partir des bandes rouge (B3) et proche infrarouge (B4) :
+
+$$NDVI = \frac{PIR - Rouge}{PIR + Rouge} = \frac{B4 - B3}{B4 + B3}$$
+
+Les valeurs vont de -1 (eau, sol nu) à +1 (végétation dense).
+
+```{r}
+#| eval: false
+
+L7 <- read_stars(system.file("tif/L7_ETMs.tif", package = "stars"))
+
+# Extraire bandes rouge (B3) et PIR (B4)
+b3_rouge <- L7[,,,3]
+b4_pir   <- L7[,,,4]
+
+# Calculer le NDVI
+ndvi <- (b4_pir - b3_rouge) / (b4_pir + b3_rouge)
+
+ggplot() +
+  geom_stars(data = ndvi) +
+  scale_fill_distiller(
+    palette  = "RdYlGn",
+    direction = 1,
+    name     = "NDVI",
+    limits   = c(-1, 1),
+    na.value = "grey80"
+  ) +
+  coord_equal() +
+  labs(
+    title    = "NDVI — Indice de végétation",
+    subtitle = "Vert = végétation | Rouge = sol nu / eau",
+    caption  = "Landsat 7 ETM+ — Olinda, Brésil"
+  ) +
+  theme_void()
+```
+:::
+
+------------------------------------------------------------------------
+
+## Liens utiles {#sec-links}
+
+-   [Geocomputation with R — Ch. 2 : Raster data](https://geocompr.robinlovelace.net/spatial-class.html#raster-data)
+-   [terra documentation](https://rspatial.org/terra/)
+-   [stars documentation](https://r-spatial.github.io/stars/)
+-   [tidyterra](https://dieghernan.github.io/tidyterra/) — intégration terra + ggplot2
+-   [USGS Landsat](https://www.usgs.gov/landsat-missions) — source des images Landsat
+
+------------------------------------------------------------------------
+
+> **← Précédent : [Systèmes de Coordonnées de Référence](1_2_crs.qmd)** **→ Suivant : [Choroplèthes et Classification](choropleths.qmd)**
+
+------------------------------------------------------------------------
+
+*Dr. Elisabetta Pietrostefani — Directrice Adjointe, Geographic Data Science Lab — Université de Liverpool \| Co-Directrice, [Imago : Data Service for Imagery](https://imago.ac.uk/) \| Chercheuse Associée, London School of Economics*

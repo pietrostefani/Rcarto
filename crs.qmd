@@ -1,0 +1,311 @@
+---
+title: "Systèmes de Coordonnées de Référence"
+author: "Dr. Elisabetta Pietrostefani"
+date: today
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    toc-title: "Table des matières"
+    number-sections: true
+    code-fold: show
+    code-tools: true
+    theme: cosmo
+    highlight-style: github
+    embed-resources: true
+    fig-align: center
+    fig-width: 8
+    fig-height: 6
+execute:
+  warning: false
+  message: false
+  echo: true
+---
+
+## Pourquoi les SCR sont-ils importants ? {#sec-intro}
+
+Imaginez deux couches de données : des communes françaises en **Lambert-93** et des points GPS en **WGS84**. Si vous les superposez sans harmoniser les SCR, vos communes peuvent se retrouver au milieu de l'océan Atlantique. Les Systèmes de Coordonnées de Référence (SCR) définissent **ce que signifient vos coordonnées** — sans eux, un point `(2.35, 48.85)` ne veut rien dire.
+
+::: callout-important
+## Règle d'or
+
+**Toujours vérifier et harmoniser les SCR** avant de combiner deux couches spatiales.
+:::
+
+```{r}
+#| label: setup
+#| message: false
+
+library(sf)
+library(spData)
+library(ggplot2)
+library(dplyr)
+library(patchwork)
+```
+
+------------------------------------------------------------------------
+
+## Les concepts fondamentaux {#sec-concepts}
+
+### Coordonnées et espace cartésien
+
+Une coordonnée est un nombre mesuré le long d'une règle imaginaire, avec une origine (0), une unité (mètre, degré…) et une direction. Dans l'espace cartésien 2D, la distance entre deux points $(x_1, y_1)$ et $(x_2, y_2)$ est :
+
+$$d = \sqrt{(x_1 - x_2)^2 + (y_1 - y_2)^2}$$
+
+Ce calcul n'est valide qu'en **coordonnées projetées** (mètres). En longitude/latitude, un degré ne vaut pas la même distance selon l'endroit sur le globe.
+
+### Systèmes de coordonnées géographiques
+
+Les systèmes géographiques identifient tout emplacement sur Terre via **longitude** et **latitude** — des mesures angulaires par rapport au méridien de Greenwich et à l'équateur. Les distances **ne sont pas en mètres** dans ce type de SCR.
+
+La surface terrestre est modélisée par un **ellipsoïde**. L'ellipsoïde combiné à un point d'ancrage forme un **datum** :
+
+-   **WGS84** — géocentrique, utilisé par le GPS et la plupart des données mondiales
+-   **RGF93** — datum officiel de la France métropolitaine
+-   **NAD83** — Amérique du Nord
+
+### Systèmes de coordonnées projetées
+
+Pour travailler sur une surface plane (papier, écran), les coordonnées sphériques sont **projetées** en coordonnées cartésiennes (x, y) en mètres. Cette projection introduit inévitablement des **déformations** — aucune projection ne peut préserver à la fois la surface, la forme, la distance et la direction.
+
+| Propriété préservée    | Projection adaptée        |
+|------------------------|---------------------------|
+| **Aire** (équivalente) | Mollweide, Albers         |
+| **Forme** (conforme)   | Mercator, Lambert conique |
+| **Distance**           | Azimutale équidistante    |
+| **Compromis général**  | Robinson, Winkel Tripel   |
+
+### Codes EPSG courants
+
+| Code EPSG | Nom                   | Usage                              |
+|-----------|-----------------------|------------------------------------|
+| **4326**  | WGS84                 | GPS, stockage de données mondiales |
+| **2154**  | RGF93 / Lambert-93    | France métropolitaine ✓            |
+| **27700** | British National Grid | Royaume-Uni                        |
+| **3857**  | Web Mercator          | Fonds de carte web (Google, OSM)   |
+| **4559**  | UTM 20N               | Guadeloupe & Martinique            |
+| **2975**  | UTM 20S               | La Réunion                         |
+| **2972**  | UTM 22N               | Guyane                             |
+| **4471**  | UTM 38S               | Mayotte                            |
+
+Recherchez n'importe quel code sur [epsg.io](https://epsg.io).
+
+------------------------------------------------------------------------
+
+## SCR dans R avec `sf` {#sec-crs-r}
+
+### Inspecter un SCR
+
+```{r}
+#| label: crs-inspect
+
+# Interroger un SCR directement par son code EPSG
+st_crs("EPSG:4326")
+```
+
+```{r}
+#| label: crs-world
+
+# Charger un fichier vectoriel et inspecter son SCR
+vector_filepath <- system.file("shapes/world.gpkg", package = "spData")
+new_vector      <- read_sf(vector_filepath)
+
+st_crs(new_vector)$IsGeographic   # géographique ou projeté ?
+st_crs(new_vector)$units_gdal     # unités (degrees, metre…)
+st_crs(new_vector)$srid           # code SRID (ex. EPSG:4326)
+st_crs(new_vector)$proj4string    # chaîne proj4
+```
+
+### Définir un SCR manquant
+
+```{r}
+#| label: set-crs
+#| eval: false
+
+# Si le SCR est absent du fichier, le déclarer manuellement
+new_vector <- st_set_crs(new_vector, "EPSG:4326")
+```
+
+::: callout-warning
+## `st_set_crs()` ≠ `st_transform()`
+
+-   `st_set_crs()` **déclare** le SCR sans toucher aux coordonnées — à utiliser quand le SCR est absent ou mal renseigné
+-   `st_transform()` **reprojecte** les coordonnées vers un nouveau SCR — à utiliser pour changer de projection
+
+Confondre les deux est l'une des erreurs les plus fréquentes en SIG.
+:::
+
+------------------------------------------------------------------------
+
+## L'effet de la projection sur la forme {#sec-projections}
+
+Une même couche de données peut avoir une apparence très différente selon la projection utilisée. C'est un choix **éditorial** autant que technique.
+
+```{r}
+#| label: fig-projections
+#| fig-cap: "La même couche mondiale sous trois projections différentes"
+#| fig-height: 9
+#| fig-width: 8
+
+# WGS84 — projection par défaut (longitude/latitude)
+p1 <- ggplot(world) +
+  geom_sf(aes(fill = continent), show.legend = FALSE,
+          linewidth = 0.1, color = "white") +
+  scale_fill_brewer(palette = "Set3") +
+  labs(title    = "WGS84 (EPSG:4326)",
+       subtitle = "Longitude / latitude — déformation aux pôles") +
+  theme_void(base_size = 10) +
+  theme(plot.title    = element_text(face = "bold", hjust = 0.5),
+        plot.subtitle = element_text(color = "grey40", hjust = 0.5, size = 8))
+
+# Mollweide — aire préservée
+world_moll <- st_transform(world, crs = "+proj=moll")
+p2 <- ggplot(world_moll) +
+  geom_sf(aes(fill = continent), show.legend = FALSE,
+          linewidth = 0.1, color = "white") +
+  scale_fill_brewer(palette = "Set3") +
+  labs(title    = "Mollweide",
+       subtitle = "Aire préservée — idéale pour les cartes thématiques mondiales") +
+  theme_void(base_size = 10) +
+  theme(plot.title    = element_text(face = "bold", hjust = 0.5),
+        plot.subtitle = element_text(color = "grey40", hjust = 0.5, size = 8))
+
+# Lambert azimutale centrée sur Paris
+world_laea <- st_transform(
+  world, crs = "+proj=laea +x_0=0 +y_0=0 +lon_0=2.3 +lat_0=48.9"
+)
+p3 <- ggplot(world_laea) +
+  geom_sf(aes(fill = continent), show.legend = FALSE,
+          linewidth = 0.1, color = "white") +
+  scale_fill_brewer(palette = "Set3") +
+  labs(title    = "Lambert azimutale (centrée sur Paris)",
+       subtitle = "Distance préservée depuis le centre — vue satellite") +
+  theme_void(base_size = 10) +
+  theme(plot.title    = element_text(face = "bold", hjust = 0.5),
+        plot.subtitle = element_text(color = "grey40", hjust = 0.5, size = 8))
+
+p1 / p2 / p3
+```
+
+::: callout-tip
+## Quelle projection choisir ?
+
+-   **France métropolitaine** → Lambert-93 (`EPSG:2154`) — projection officielle de l'IGN
+-   **Données mondiales** → WGS84 pour stocker, Mollweide pour visualiser l'aire
+-   **Cartes web** → Web Mercator (`EPSG:3857`)
+-   **Toute analyse de distance ou de superficie** → toujours une projection en mètres
+:::
+
+------------------------------------------------------------------------
+
+## Application : La France en Lambert-93 {#sec-france}
+
+Lambert-93 est la projection officielle pour la France métropolitaine. Comparer WGS84 et Lambert-93 montre pourquoi la projection choisie **change la forme perçue** du territoire.
+
+```{r}
+#| label: fig-france-projections
+#| fig-cap: "La France en WGS84 (géographique) vs Lambert-93 (projeté) — la forme est différente"
+#| fig-height: 5
+
+france_wgs84   <- world[world$name_long == "France", ]
+france_lambert <- st_transform(france_wgs84, 2154)
+
+p_wgs <- ggplot(france_wgs84) +
+  geom_sf(fill = "#2c7bb6", color = "white", linewidth = 0.5) +
+  labs(title    = "WGS84 (EPSG:4326)",
+       subtitle = "Degrés — non adapté aux calculs de distance") +
+  theme_void(base_size = 11) +
+  theme(plot.title    = element_text(face = "bold", hjust = 0.5),
+        plot.subtitle = element_text(color = "grey40", hjust = 0.5, size = 9))
+
+p_lam <- ggplot(france_lambert) +
+  geom_sf(fill = "#d7191c", color = "white", linewidth = 0.5) +
+  labs(title    = "Lambert-93 (EPSG:2154)",
+       subtitle = "Mètres — projection officielle IGN") +
+  theme_void(base_size = 11) +
+  theme(plot.title    = element_text(face = "bold", hjust = 0.5),
+        plot.subtitle = element_text(color = "grey40", hjust = 0.5, size = 9))
+
+p_wgs + p_lam
+```
+
+### Calculer des superficies correctement
+
+```{r}
+#| label: area-example
+
+# En WGS84 : st_area() donne des résultats en m² via s2 (sphère)
+# En Lambert-93 : calcul plan exact en mètres carrés
+france_lambert |>
+  mutate(superficie_km2 = as.numeric(st_area(france_lambert)) / 1e6) |>
+  st_drop_geometry() |>
+  select(name_long, superficie_km2)
+```
+
+------------------------------------------------------------------------
+
+## Exercices {#sec-exercises}
+
+::: callout-note
+## Exercice 1 — Comparer deux projections
+
+Reprojetez la France en **Web Mercator** (`EPSG:3857`) et affichez les trois projections côte à côte (WGS84, Lambert-93, Web Mercator). Laquelle déforme le plus le territoire ?
+
+```{r}
+#| eval: false
+
+france_mercator <- st_transform(france_wgs84, 3857)
+
+ggplot(france_mercator) +
+  geom_sf(fill = "...", color = "white") +
+  labs(title = "Web Mercator (EPSG:3857)") +
+  theme_void()
+```
+:::
+
+::: callout-note
+## Exercice 2 — Superficies des régions françaises
+
+1.  Chargez `gadm41_FRA_1.shp` (régions françaises depuis GADM)
+2.  Vérifiez son SCR avec `st_crs()`
+3.  Reprojetez en Lambert-93
+4.  Calculez la superficie de chaque région avec `st_area()`
+5.  Cartographiez les superficies avec `ggplot2`
+
+```{r}
+#| eval: false
+
+france_reg <- read_sf("data/France/gadm41_FRA_shp/gadm41_FRA_1.shp")
+
+st_crs(france_reg)   # 1. Vérifier
+
+france_reg_lambert <- st_transform(france_reg, 2154)   # 2. Reprojeter
+
+france_reg_lambert <- france_reg_lambert |>
+  mutate(superficie_km2 = as.numeric(st_area(france_reg_lambert)) / 1e6)  # 3. Calculer
+
+ggplot(france_reg_lambert) +
+  geom_sf(aes(fill = superficie_km2), color = "white", linewidth = 0.3) +
+  scale_fill_viridis_c(name = "Superficie (km²)") +
+  labs(title   = "Superficie des régions françaises",
+       caption = "Source : GADM | Cours R-Carto") +
+  theme_void()
+```
+:::
+
+------------------------------------------------------------------------
+
+## Liens utiles {#sec-links}
+
+-   [Geocomputation with R — Ch. 6 : Reprojecting geographic data](https://geocompr.robinlovelace.net/reproj-geo-data.html)
+-   [epsg.io](https://epsg.io) — rechercher n'importe quel code EPSG
+-   [Projection Wizard](https://projectionwizard.org) — outil pour choisir la bonne projection
+
+------------------------------------------------------------------------
+
+> **← Précédent : [Données Spatiales et Simple Features](1_1_R_pourlacartographie.qmd)** **→ Suivant : [Données Raster](1_3_raster.qmd)**
+
+------------------------------------------------------------------------
+
+*Dr. Elisabetta Pietrostefani — Directrice Adjointe, Geographic Data Science Lab — Université de Liverpool \| Co-Directrice, [Imago : Data Service for Imagery](https://imago.ac.uk/) \| Chercheuse Associée, London School of Economics*

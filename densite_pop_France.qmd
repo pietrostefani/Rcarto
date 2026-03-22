@@ -1,0 +1,336 @@
+---
+title: "4.1b — Densité de Population France : Corrigé"
+subtitle: "R pour la Cartographie et les SIG"
+author: "Dr. Elisabetta Pietrostefani"
+date: today
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    toc-title: "Table des matières"
+    number-sections: true
+    code-fold: false
+    code-tools: true
+    theme: cosmo
+    highlight-style: github
+    embed-resources: true
+    fig-align: center
+    fig-width: 8
+    fig-height: 7
+execute:
+  warning: false
+  message: false
+  echo: true
+---
+
+::: {.callout-important}
+## Corrigé — à consulter après avoir essayé par vous-mêmes
+
+Ce document contient les réponses complètes à l'exercice France posé à la fin de 
+[4.1 — Densité et Évolution de la Population](4_1_densite_pop.qmd).
+:::
+
+```{r}
+#| label: setup
+#| message: false
+
+library(terra)
+library(sf)
+library(exactextractr)
+library(ggplot2)
+library(dplyr)
+library(tidyterra)
+library(classInt)
+library(scales)
+library(patchwork)
+```
+
+---
+
+## Étape 1 — Charger et recadrer {#sec-load}
+
+```{r}
+#| label: load-data
+
+# Rasters GPW
+pop_2010 <- rast("data/France/gpw_v4_population_count_rev11_2010_2pt5_min.tif")
+pop_2020 <- rast("data/France/gpw_v4_population_count_rev11_2020_2pt5_min.tif")
+
+# Shapefile GADM niveau 2 — départements français
+# (utiliser gadm41_FRA_3.shp pour les arrondissements si disponible)
+france <- read_sf("data/France/gadm41_FRA_shp/gadm41_FRA_2.shp") |>
+  filter(!HASC_2 %in% c("FR.GP", "FR.MQ", "FR.GF", "FR.RE", "FR.YT")) # métropole uniquement
+
+cat("SCR raster  :", crs(pop_2010, describe = TRUE)$name, "\n")
+cat("SCR vecteur :", st_crs(france)$srid, "\n")
+cat("Nb départements :", nrow(france), "\n")
+```
+
+```{r}
+#| label: crop-mask
+
+# Recadrer et masquer
+pop_2010_fr <- crop(pop_2010, france) |> mask(france)
+pop_2020_fr <- crop(pop_2020, france) |> mask(france)
+
+# Reprojeter en Lambert-93
+france_l93    <- st_transform(france, 2154)
+pop_2010_l93  <- terra::project(pop_2010_fr, "EPSG:2154")
+pop_2020_l93  <- terra::project(pop_2020_fr, "EPSG:2154")
+
+cat("Population totale 2010 :",
+    format(round(global(pop_2010_fr, "sum", na.rm = TRUE)[[1]]), big.mark = " "), "\n")
+cat("Population totale 2020 :",
+    format(round(global(pop_2020_fr, "sum", na.rm = TRUE)[[1]]), big.mark = " "), "\n")
+```
+
+---
+
+## Étape 2 — Visualiser les rasters bruts {#sec-viz}
+
+```{r}
+#| label: fig-rasters-france
+#| fig-cap: "Population totale par cellule — France métropolitaine 2010 et 2020"
+
+pop_2010_log <- log1p(pop_2010_fr)
+pop_2020_log <- log1p(pop_2020_fr)
+
+p1 <- ggplot() +
+  geom_spatraster(data = pop_2010_log) +
+  scale_fill_viridis_c(
+    option = "inferno", name = "log(pop + 1)",
+    na.value = "transparent"
+  ) +
+  geom_sf(data = france, fill = NA, color = "white", linewidth = 0.1) +
+  labs(title = "2010") +
+  theme_void(base_size = 11) +
+  theme(plot.title = element_text(face = "bold", hjust = 0.5),
+        legend.key.height = unit(1.2, "cm"))
+
+p2 <- ggplot() +
+  geom_spatraster(data = pop_2020_log) +
+  scale_fill_viridis_c(
+    option = "inferno", name = "log(pop + 1)",
+    na.value = "transparent"
+  ) +
+  geom_sf(data = france, fill = NA, color = "white", linewidth = 0.1) +
+  labs(title = "2020") +
+  theme_void(base_size = 11) +
+  theme(plot.title = element_text(face = "bold", hjust = 0.5),
+        legend.key.height = unit(1.2, "cm"))
+
+p1 + p2 +
+  plot_annotation(
+    title    = "Population de la France métropolitaine — GPW v4",
+    subtitle = "Échelle logarithmique",
+    caption  = "Source : GPW v4 | Cours R-Carto",
+    theme    = theme(
+      plot.title    = element_text(face = "bold", hjust = 0.5, size = 14),
+      plot.subtitle = element_text(color = "grey40", hjust = 0.5)
+    )
+  )
+```
+
+---
+
+## Étape 3 — Statistiques zonales {#sec-zonal}
+
+```{r}
+#| label: zonal-stats
+
+# Superficie en km²
+france_l93$area_km2 <- as.numeric(st_area(france_l93)) / 1e6
+
+# Extraction population par département
+france_l93$pop_2010 <- exact_extract(pop_2010_l93, france_l93, "sum", progress = FALSE)
+france_l93$pop_2020 <- exact_extract(pop_2020_l93, france_l93, "sum", progress = FALSE)
+
+# Densités
+france_l93 <- france_l93 |>
+  mutate(
+    density_2010 = pop_2010 / area_km2,
+    density_2020 = pop_2020 / area_km2
+  )
+
+# Top 8 départements les plus denses
+france_l93 |> st_drop_geometry() |>
+  select(NAME_2, area_km2, pop_2010, density_2010) |>
+  arrange(desc(density_2010)) |>
+  head(8) |>
+  mutate(across(where(is.numeric), ~ round(.x, 1))) |>
+  knitr::kable(caption = "Départements les plus denses — France 2010")
+```
+
+---
+
+## Étape 4 — Cartes de densité {#sec-density}
+
+```{r}
+#| label: fig-density-france
+#| fig-cap: "Densité de population par département — France métropolitaine 2010 et 2020"
+#| fig-height: 8
+
+clean_labels <- function(x) {
+  levels(x) <- gsub("\\(|\\[|\\]|\\)", "", levels(x)) |>
+    gsub(",", " – ", x = _)
+  x
+}
+
+dens_vec <- france_l93 |> st_drop_geometry() |> pull(density_2010) |> na.omit()
+breaks_j <- classIntervals(dens_vec, n = 6, style = "jenks")$brks
+
+france_l93 <- france_l93 |>
+  mutate(
+    cls_2010 = cut(density_2010, breaks = breaks_j,
+                   include.lowest = TRUE, dig.lab = 0,
+                   ordered_result = TRUE) |> clean_labels(),
+    cls_2020 = cut(density_2020, breaks = breaks_j,
+                   include.lowest = TRUE, dig.lab = 0,
+                   ordered_result = TRUE) |> clean_labels()
+  )
+
+m1 <- ggplot(france_l93) +
+  geom_sf(aes(fill = cls_2010), color = "white", linewidth = 0.2) +
+  scale_fill_brewer(palette = "YlOrRd", name = "hab/km²", na.value = "grey80") +
+  labs(title = "2010") +
+  theme_void(base_size = 11) +
+  theme(plot.title = element_text(face = "bold", hjust = 0.5))
+
+m2 <- ggplot(france_l93) +
+  geom_sf(aes(fill = cls_2020), color = "white", linewidth = 0.2) +
+  scale_fill_brewer(palette = "YlOrRd", name = "hab/km²", na.value = "grey80") +
+  labs(title = "2020") +
+  theme_void(base_size = 11) +
+  theme(plot.title = element_text(face = "bold", hjust = 0.5))
+
+m1 + m2 +
+  plot_annotation(
+    title   = "Densité de population — France métropolitaine",
+    caption = "Source : GPW v4 / GADM | Classification Jenks (n = 6) | Cours R-Carto",
+    theme   = theme(
+      plot.title   = element_text(face = "bold", hjust = 0.5, size = 14),
+      plot.caption = element_text(color = "grey55", hjust = 0)
+    )
+  )
+```
+
+---
+
+## Étape 5 — Évolution 2010–2020 {#sec-change}
+
+```{r}
+#| label: pop-change
+
+# Algèbre raster — changement en %
+pop_change_fr <- (pop_2020_l93 - pop_2010_l93) / pop_2010_l93 * 100
+pop_change_clip <- clamp(pop_change_fr, lower = -20, upper = 30, values = FALSE)
+```
+
+```{r}
+#| label: fig-change-raster
+#| fig-cap: "Évolution de la population 2010–2020 — niveau cellule (raster)"
+
+ggplot() +
+  geom_spatraster(data = pop_change_clip) +
+  scale_fill_distiller(
+    palette   = "RdBu",
+    direction = 1,
+    name      = "Variation (%)",
+    limits    = c(-20, 30),
+    na.value  = "transparent",
+    guide     = guide_colorbar(barheight = unit(5, "cm"))
+  ) +
+  geom_sf(data = france_l93, fill = NA, color = "white", linewidth = 0.2) +
+  labs(
+    title    = "Évolution de la population — France 2010–2020",
+    subtitle = "Rouge = déclin | Bleu = croissance",
+    caption  = "Source : GPW v4 | Cours R-Carto"
+  ) +
+  theme_void(base_size = 12) +
+  theme(
+    plot.title    = element_text(face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(color = "grey40", hjust = 0.5)
+  )
+```
+
+```{r}
+#| label: change-by-dept
+
+france_l93 <- france_l93 |>
+  mutate(pop_change_pct = (pop_2020 - pop_2010) / pop_2010 * 100)
+```
+
+```{r}
+#| label: fig-change-map
+#| fig-cap: "Évolution de la population par département — France 2010–2020"
+
+ggplot(france_l93) +
+  geom_sf(aes(fill = pop_change_pct), color = "white", linewidth = 0.2) +
+  scale_fill_distiller(
+    palette   = "RdBu",
+    direction = 1,
+    name      = "Variation (%)",
+    limits    = c(-10, 15),
+    oob       = squish,
+    na.value  = "grey80",
+    guide     = guide_colorbar(barheight = unit(5, "cm"))
+  ) +
+  labs(
+    title    = "Évolution de la population par département",
+    subtitle = "France métropolitaine 2010–2020 | Rouge = déclin | Bleu = croissance",
+    caption  = "Source : GPW v4 / GADM | Cours R-Carto"
+  ) +
+  theme_void(base_size = 12) +
+  theme(
+    plot.title    = element_text(face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(color = "grey40", hjust = 0.5)
+  )
+```
+
+---
+
+## Bonus — Graphique des 10 départements à plus forte croissance {#sec-bonus}
+
+```{r}
+#| label: fig-top-growth
+#| fig-cap: "Les 10 départements français à plus forte croissance démographique 2010–2020"
+#| fig-height: 5
+
+france_l93 |> st_drop_geometry() |>
+  filter(!is.na(pop_change_pct)) |>
+  slice_max(pop_change_pct, n = 10) |>
+  mutate(NAME_2 = reorder(NAME_2, pop_change_pct)) |>
+  ggplot(aes(x = NAME_2, y = pop_change_pct, fill = pop_change_pct)) +
+  geom_col(color = "white", width = 0.7) +
+  scale_fill_distiller(palette = "Blues", direction = 1, guide = "none") +
+  scale_y_continuous(labels = label_number(suffix = "%")) +
+  coord_flip() +
+  labs(
+    title   = "Top 10 — Croissance démographique 2010–2020",
+    x       = NULL,
+    y       = "Variation (%)",
+    caption = "Source : GPW v4 / GADM | Cours R-Carto"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(plot.title = element_text(face = "bold"))
+```
+
+---
+
+## Comparaison Royaume-Uni / France {#sec-compare}
+
+| | Royaume-Uni | France |
+|--|-------------|--------|
+| **Population 2010** | ~62 M | ~65 M |
+| **Population 2020** | ~67 M | ~67 M |
+| **Projection utilisée** | British National Grid (EPSG:27700) | Lambert-93 (EPSG:2154) |
+| **Niveau administratif** | Comtés (GADM niveau 2) | Départements (GADM niveau 2) |
+| **Outil extraction** | `exactextractr::exact_extract()` | `exactextractr::exact_extract()` |
+
+---
+
+> **← Retour au cours : [4.1 — Densité et Évolution de la Population](4_1_densite_pop.qmd)**
+
+---
+
+*Dr. Elisabetta Pietrostefani — Directrice Adjointe, Geographic Data Science Lab — Université de Liverpool | Co-Directrice, [Imago : Data Service for Imagery](https://imago.ac.uk/) | Chercheuse Associée, London School of Economics*

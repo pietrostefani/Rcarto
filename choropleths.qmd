@@ -1,0 +1,607 @@
+---
+title: "Choroplèthes"
+author: "Dr. Elisabetta Pietrostefani"
+date: today
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    toc-title: "Table des matières"
+    number-sections: true
+    code-fold: show
+    code-tools: true
+    theme: cosmo
+    highlight-style: github
+    embed-resources: true
+    fig-align: center
+    fig-width: 8
+    fig-height: 6
+execute:
+  warning: false
+  message: false
+  echo: true
+---
+
+## Qu'est-ce qu'une carte choroplèthe ? {#sec-what}
+
+Une **carte choroplèthe** est une représentation thématique dans laquelle chaque unité géographique (commune, département, région, pays…) est colorée selon la valeur d'une variable statistique.
+
+C'est l'équivalent cartographique de l'histogramme : les deux permettent d'observer la **distribution spatiale** d'une variable.
+
+::: callout-important
+## La décision clé
+
+Pourquoi une valeur donnée reçoit-elle une couleur spécifique ? Le choix de la **méthode de classification** et de la **palette de couleurs** change radicalement le message de la carte.
+:::
+
+------------------------------------------------------------------------
+
+## Données et packages {#sec-data}
+
+Nous utilisons `{sf}` pour les objets spatiaux, `{ggplot2}` pour toute la cartographie, et `{rnaturalearth}` pour les données géographiques françaises.
+
+```{r}
+#| label: setup
+#| message: false
+
+library(sf)                 # objets spatiaux
+library(ggplot2)            # visualisation — notre outil principal
+library(dplyr)              # manipulation de données
+library(classInt)           # méthodes de classification
+library(viridis)            # palettes perceptuellement uniformes
+library(RColorBrewer)       # palettes ColorBrewer
+library(scales)             # formatage des axes et légendes
+library(rnaturalearth)      # données géographiques
+library(rnaturalearthdata)
+
+# Régions françaises métropolitaines
+france_regions <- ne_states(country = "France", returnclass = "sf") |>
+  filter(!name %in% c("Guyane française", "Martinique",
+                       "Guadeloupe", "La Réunion", "Mayotte")) |>
+  select(name, region, iso_3166_2, geometry)
+
+glimpse(france_regions)
+```
+
+```{r}
+#| label: add-data
+
+# Données socio-économiques simulées
+# (dans un vrai projet : read_csv() + left_join())
+set.seed(42)
+n <- nrow(france_regions)
+
+france_regions <- france_regions |>
+  mutate(
+    taux_chomage  = round(runif(n, min = 4.5, max = 18.0), 1),
+    revenu_median = round(rnorm(n, mean = 1850, sd = 280), 0),
+    densite_pop   = round(exp(rnorm(n, mean = 4.8, sd = 1.2)), 0),
+    part_diplomes = round(rnorm(n, mean = 28, sd = 7), 1)
+  )
+
+# Vecteur numérique brut — nécessaire pour classIntervals
+chomage_vec <- france_regions |> st_drop_geometry() |> pull(taux_chomage)
+
+# Fonction utilitaire : remplace les labels (a,b] par "a – b" (plus lisible)
+clean_cut_labels <- function(x) {
+  levels(x) <- gsub("\\(|\\[|\\]|\\)", "", levels(x)) |>  # retirer les crochets
+    gsub(",", " – ", x = _)                                 # remplacer la virgule
+  x
+}
+
+france_regions |>
+  st_drop_geometry() |>
+  select(name, taux_chomage, revenu_median, densite_pop) |>
+  head(8) |>
+  knitr::kable(caption = "Extrait des données simulées par région")
+```
+
+------------------------------------------------------------------------
+
+## Première carte : deux syntaxes, un même résultat {#sec-first-map}
+
+Avant de classifier, affichons simplement la géographie. Ce cours utilise `ggplot2` comme outil principal tout au long des deux jours — mais il est utile de voir une fois comment `mapsf` produit le même résultat avec une syntaxe différente.
+
+```{r}
+#| label: fig-base-mapsf
+#| fig-cap: "Carte de base avec `mapsf` — syntaxe proche de la cartographie classique"
+
+library(mapsf)
+
+mf_map(france_regions, type = "base",
+       col    = "#e8f4f8",
+       border = "white",
+       lwd    = 0.8)
+mf_title("Régions françaises — mapsf")
+mf_credits("Source : Natural Earth")
+```
+
+```{r}
+#| label: fig-base-ggplot
+#| fig-cap: "La même carte avec `ggplot2` — syntaxe que nous utiliserons tout au long du cours"
+
+ggplot(france_regions) +
+  geom_sf(fill = "#e8f4f8", color = "white", linewidth = 0.5) +
+  labs(
+    title   = "Régions françaises — ggplot2",
+    caption = "Source : Natural Earth | Cours R-Carto"
+  ) +
+  theme_void(base_size = 13) +
+  theme(plot.title = element_text(face = "bold", hjust = 0.5))
+```
+
+::: callout-note
+## Pourquoi ggplot2 ?
+
+`mapsf` est excellent pour produire des cartes rapidement avec peu de code. Nous choisissons `ggplot2` parce qu'il partage exactement la **même grammaire** que tous vos autres graphiques — histogrammes, nuages de points, boxplots. Apprendre une seule syntaxe suffit pour tout visualiser.
+:::
+
+------------------------------------------------------------------------
+
+## Méthodes de classification {#sec-classification}
+
+Le choix de la méthode de classification est **la décision cartographique la plus importante**. Voyons les quatre principales méthodes appliquées au taux de chômage.
+
+### Aperçu de la distribution
+
+Toujours examiner la distribution avant de cartographier.
+
+```{r}
+#| label: fig-distribution
+#| fig-cap: "Distribution du taux de chômage simulé par région"
+#| fig-height: 4
+
+ggplot(france_regions, aes(x = taux_chomage)) +
+  geom_histogram(binwidth = 1.5, fill = "#2c7bb6", color = "white", alpha = 0.85) +
+  geom_density(aes(y = after_stat(count) * 1.5),
+               color = "#d7191c", linewidth = 1) +
+  labs(
+    title    = "Distribution du taux de chômage par région",
+    subtitle = "Données simulées à des fins pédagogiques",
+    x = "Taux de chômage (%)",
+    y = "Nombre de régions"
+  ) +
+  theme_minimal(base_size = 13) +
+  theme(plot.title = element_text(face = "bold"))
+```
+
+### Méthode 1 — Intervalle égal (*equal interval*)
+
+Divise la plage des valeurs en intervalles de largeur identique, **indépendamment de la distribution des données**.
+
+```{r}
+#| label: fig-equal-interval
+#| fig-cap: "Classification par intervalles égaux"
+
+breaks_equal <- classIntervals(chomage_vec, n = 5, style = "equal")
+
+france_regions <- france_regions |>
+  mutate(classe_equal = cut(taux_chomage,
+                             breaks = breaks_equal$brks,
+                             include.lowest = TRUE,
+                             dig.lab = 4,
+                             ordered_result = TRUE) |> clean_cut_labels())
+
+ggplot(france_regions) +
+  geom_sf(aes(fill = classe_equal), color = "white", linewidth = 0.4) +
+  scale_fill_brewer(palette = "YlOrRd", name = "Taux de\nchômage (%)") +
+  labs(
+    title    = "Intervalle égal (n = 5)",
+    subtitle = "Chaque classe couvre un intervalle de valeurs identique",
+    caption  = "Données simulées | Cours R-Carto"
+  ) +
+  theme_void(base_size = 12) +
+  theme(plot.title    = element_text(face = "bold", hjust = 0.5),
+        plot.subtitle = element_text(color = "grey40", hjust = 0.5),
+        legend.position = "right")
+
+cat("Bornes — intervalle égal :", round(breaks_equal$brks, 1), "\n")
+```
+
+::: callout-warning
+## Attention avec l'intervalle égal
+
+Si la distribution est asymétrique, cette méthode peut créer des classes **presque vides** et des classes **très peuplées**, rendant la carte peu informative.
+:::
+
+### Méthode 2 — Quantiles (*quantile*)
+
+Chaque classe contient le **même nombre d'observations**, indépendamment des valeurs numériques.
+
+```{r}
+#| label: fig-quantiles
+#| fig-cap: "Classification par quantiles"
+
+breaks_quantile <- classIntervals(chomage_vec, n = 5, style = "quantile")
+
+france_regions <- france_regions |>
+  mutate(classe_quantile = cut(taux_chomage,
+                                breaks = breaks_quantile$brks,
+                                include.lowest = TRUE,
+                                dig.lab = 4,
+                                ordered_result = TRUE) |> clean_cut_labels())
+
+ggplot(france_regions) +
+  geom_sf(aes(fill = classe_quantile), color = "white", linewidth = 0.4) +
+  scale_fill_brewer(palette = "YlOrRd", name = "Taux de\nchômage (%)") +
+  labs(
+    title    = "Quantiles (n = 5)",
+    subtitle = "Chaque classe contient le même nombre de régions",
+    caption  = "Données simulées | Cours R-Carto"
+  ) +
+  theme_void(base_size = 12) +
+  theme(plot.title    = element_text(face = "bold", hjust = 0.5),
+        plot.subtitle = element_text(color = "grey40", hjust = 0.5),
+        legend.position = "right")
+
+cat("Bornes — quantiles :", round(breaks_quantile$brks, 1), "\n")
+```
+
+::: callout-tip
+## Quand utiliser les quantiles ?
+
+Idéal pour **comparer les régions entre elles** (les 20% les plus élevés vs les 20% les plus faibles). Attention : peut regrouper dans la même classe des valeurs numériquement très différentes.
+:::
+
+### Méthode 3 — Jenks / Ruptures naturelles (*natural breaks*)
+
+Minimise la variance **au sein** de chaque classe et maximise la variance **entre** les classes.
+
+```{r}
+#| label: fig-jenks
+#| fig-cap: "Classification de Jenks — optimise la cohérence interne des classes"
+
+breaks_jenks <- classIntervals(chomage_vec, n = 5, style = "jenks")
+
+france_regions <- france_regions |>
+  mutate(classe_jenks = cut(taux_chomage,
+                             breaks = breaks_jenks$brks,
+                             include.lowest = TRUE,
+                             dig.lab = 4,
+                             ordered_result = TRUE) |> clean_cut_labels())
+
+ggplot(france_regions) +
+  geom_sf(aes(fill = classe_jenks), color = "white", linewidth = 0.4) +
+  scale_fill_brewer(palette = "YlOrRd", name = "Taux de\nchômage (%)") +
+  labs(
+    title    = "Jenks / Ruptures naturelles (n = 5)",
+    subtitle = "Les bornes suivent les sauts naturels de la distribution",
+    caption  = "Données simulées | Cours R-Carto"
+  ) +
+  theme_void(base_size = 12) +
+  theme(plot.title    = element_text(face = "bold", hjust = 0.5),
+        plot.subtitle = element_text(color = "grey40", hjust = 0.5),
+        legend.position = "right")
+
+cat("Bornes — Jenks :", round(breaks_jenks$brks, 1), "\n")
+```
+
+### Méthode 4 — Écart-type (*standard deviation*)
+
+Les classes sont définies par rapport à la **moyenne**, en multiples d'écart-type. Très utile pour mettre en évidence les valeurs atypiques.
+
+```{r}
+#| label: fig-sd
+#| fig-cap: "Classification par écart-type — met en évidence les valeurs atypiques"
+
+breaks_sd <- classIntervals(chomage_vec, n = 5, style = "sd")
+
+france_regions <- france_regions |>
+  mutate(classe_sd = cut(taux_chomage,
+                          breaks = breaks_sd$brks,
+                          include.lowest = TRUE,
+                          dig.lab = 4,
+                          ordered_result = TRUE) |> clean_cut_labels())
+
+ggplot(france_regions) +
+  geom_sf(aes(fill = classe_sd), color = "white", linewidth = 0.4) +
+  scale_fill_brewer(palette = "RdBu", direction = -1,
+                    name = "Taux de\nchômage (%)") +
+  labs(
+    title    = "Écart-type",
+    subtitle = paste0("Moyenne : ", round(mean(chomage_vec), 1),
+                      "% | Écart-type : ", round(sd(chomage_vec), 1), "%"),
+    caption  = "Données simulées | Cours R-Carto"
+  ) +
+  theme_void(base_size = 12) +
+  theme(plot.title    = element_text(face = "bold", hjust = 0.5),
+        plot.subtitle = element_text(color = "grey40", hjust = 0.5),
+        legend.position = "right")
+```
+
+### Comparaison visuelle des quatre méthodes
+
+```{r}
+#| label: fig-comparaison
+#| fig-cap: "Position des bornes de chaque méthode sur la distribution"
+#| fig-height: 7
+#| fig-width: 10
+
+bornes <- data.frame(
+  valeur  = c(breaks_equal$brks, breaks_quantile$brks,
+              breaks_jenks$brks, breaks_sd$brks),
+  methode = rep(
+    c("Intervalle égal", "Quantiles", "Jenks", "Écart-type"),
+    times = c(length(breaks_equal$brks),   length(breaks_quantile$brks),
+              length(breaks_jenks$brks),    length(breaks_sd$brks))
+  )
+) |>
+  mutate(methode = factor(methode,
+                           levels = c("Intervalle égal", "Quantiles",
+                                      "Jenks", "Écart-type")))
+
+histo <- data.frame(x = chomage_vec)
+
+ggplot() +
+  geom_histogram(data = histo, aes(x = x),
+                 binwidth = 1.2, fill = "#cce5f0", color = "white") +
+  geom_vline(data = bornes, aes(xintercept = valeur),
+             color = "#d7191c", linewidth = 0.8, linetype = "dashed") +
+  facet_wrap(~methode, nrow = 2) +
+  labs(
+    title   = "Position des bornes selon la méthode de classification",
+    x       = "Taux de chômage (%)",
+    y       = "Nombre de régions",
+    caption = "Les lignes rouges indiquent les bornes de chaque classe"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(plot.title   = element_text(face = "bold", hjust = 0.5),
+        strip.text   = element_text(face = "bold"),
+        plot.caption = element_text(color = "grey50", size = 9))
+```
+
+------------------------------------------------------------------------
+
+## Choix de la palette de couleurs {#sec-palette}
+
+La palette doit correspondre à la **nature de la variable** et à l'**objectif de la carte**.
+
+### Palettes séquentielles — variables continues unidirectionnelles
+
+Pour des variables qui vont du bas vers le haut (chômage, densité, revenu).
+
+```{r}
+#| label: fig-sequential
+#| fig-cap: "Palette séquentielle (viridis) — lisible en noir et blanc et pour les daltoniens"
+
+ggplot(france_regions) +
+  geom_sf(aes(fill = taux_chomage), color = "white", linewidth = 0.4) +
+  scale_fill_viridis_c(
+    option = "viridis",
+    name   = "Taux de\nchômage (%)",
+    labels = label_number(suffix = "%")
+  ) +
+  labs(
+    title    = "Palette séquentielle : viridis",
+    subtitle = "Continue, sans classification préalable",
+    caption  = "Données simulées | Cours R-Carto"
+  ) +
+  theme_void(base_size = 12) +
+  theme(plot.title      = element_text(face = "bold", hjust = 0.5),
+        plot.subtitle   = element_text(color = "grey40", hjust = 0.5),
+        legend.key.height = unit(1.5, "cm"))
+```
+
+### Palettes divergentes — variables bipolaires
+
+Pour des variables organisées autour d'un point central (écart à la moyenne, variation positive/négative).
+
+```{r}
+#| label: fig-diverging
+#| fig-cap: "Palette divergente (RdBu) pour l'écart au revenu médian"
+
+france_regions <- france_regions |>
+  mutate(ecart_revenu = revenu_median - median(revenu_median))
+
+ggplot(france_regions) +
+  geom_sf(aes(fill = ecart_revenu), color = "white", linewidth = 0.4) +
+  scale_fill_distiller(
+    palette   = "RdBu",
+    direction = 1,
+    name      = "Écart au\nmédian (€)",
+    labels    = label_number()
+  ) +
+  labs(
+    title    = "Palette divergente : RdBu",
+    subtitle = "Bleu = au-dessus du médian national | Rouge = en dessous",
+    caption  = "Données simulées | Cours R-Carto"
+  ) +
+  theme_void(base_size = 12) +
+  theme(plot.title      = element_text(face = "bold", hjust = 0.5),
+        plot.subtitle   = element_text(color = "grey40", hjust = 0.5),
+        legend.key.height = unit(1.5, "cm"))
+```
+
+### Palettes catégorielles — données nominales
+
+Pour des variables sans ordre (vote majoritaire, type de zone, catégorie d'usage du sol).
+
+```{r}
+#| label: fig-categorical
+#| fig-cap: "Palette catégorielle — 3 niveaux de chômage"
+
+france_regions <- france_regions |>
+  mutate(zone = case_when(
+    taux_chomage < 8  ~ "Faible chômage",
+    taux_chomage < 12 ~ "Chômage modéré",
+    TRUE              ~ "Chômage élevé"
+  ),
+  zone = factor(zone, levels = c("Faible chômage",
+                                  "Chômage modéré",
+                                  "Chômage élevé")))
+
+ggplot(france_regions) +
+  geom_sf(aes(fill = zone), color = "white", linewidth = 0.4) +
+  scale_fill_manual(
+    values = c("Faible chômage"  = "#2c7bb6",
+               "Chômage modéré" = "#ffffbf",
+               "Chômage élevé"  = "#d7191c"),
+    name = "Niveau de\nchômage"
+  ) +
+  labs(
+    title    = "Palette catégorielle : 3 niveaux",
+    subtitle = "Pas de dégradé — les catégories n'ont pas d'ordre implicite de couleur",
+    caption  = "Données simulées | Cours R-Carto"
+  ) +
+  theme_void(base_size = 12) +
+  theme(plot.title    = element_text(face = "bold", hjust = 0.5),
+        plot.subtitle = element_text(color = "grey40", hjust = 0.5))
+```
+
+------------------------------------------------------------------------
+
+## Carte complète : tous les éléments réunis {#sec-full-map}
+
+Une carte publiable doit comporter : titre, sous-titre, légende, et source.
+
+```{r}
+#| label: fig-full-map
+#| fig-cap: "Carte choroplèthe complète avec tous les éléments cartographiques"
+#| fig-height: 8
+
+ggplot(france_regions) +
+  geom_sf(aes(fill = classe_jenks), color = "white", linewidth = 0.4) +
+  scale_fill_brewer(
+    palette = "YlOrRd",
+    name    = "Taux de chômage (%)\n[Jenks, n = 5]"
+  ) +
+  labs(
+    title    = "Taux de chômage par région",
+    subtitle = "France métropolitaine — données simulées",
+    caption  = "Source : données simulées à des fins pédagogiques\nCours R-Carto | Dr. E. Pietrostefani"
+  ) +
+  theme_void(base_size = 13) +
+  theme(
+    plot.title        = element_text(face = "bold", size = 16, hjust = 0.5),
+    plot.subtitle     = element_text(color = "grey40", hjust = 0.5,
+                                      margin = margin(b = 8)),
+    plot.caption      = element_text(color = "grey55", size = 9,
+                                      hjust = 0, margin = margin(t = 10)),
+    legend.position   = "right",
+    legend.title      = element_text(face = "bold", size = 10),
+    legend.key.height = unit(0.9, "cm"),
+    plot.margin       = margin(10, 20, 10, 20),
+    plot.background   = element_rect(fill = "white", color = NA)
+  )
+```
+
+### Choroplèthe + symboles proportionnels
+
+`ggplot2` permet de superposer facilement plusieurs couches — ici une choroplèthe et des cercles proportionnels sur les centroïdes.
+
+```{r}
+#| label: fig-prop-symbols
+#| fig-cap: "Combinaison choroplèthe (revenu) + symboles proportionnels (densité)"
+#| fig-height: 8
+
+centroids <- france_regions |>
+  st_centroid() |>
+  mutate(lon = st_coordinates(geometry)[, 1],
+         lat = st_coordinates(geometry)[, 2])
+
+ggplot(france_regions) +
+  geom_sf(aes(fill = revenu_median), color = "white", linewidth = 0.4) +
+  scale_fill_distiller(
+    palette   = "Blues",
+    direction = 1,
+    name      = "Revenu\nmédian (€)",
+    labels    = label_comma(suffix = " €")
+  ) +
+  geom_point(
+    data  = centroids,
+    aes(x = lon, y = lat, size = densite_pop),
+    color = "#d7191c", alpha = 0.65
+  ) +
+  scale_size_continuous(
+    name   = "Densité\n(hab/km²)",
+    range  = c(1, 10),
+    breaks = c(50, 200, 500, 1000)
+  ) +
+  labs(
+    title    = "Revenu médian et densité de population",
+    subtitle = "Choroplèthe + symboles proportionnels",
+    caption  = "Source : données simulées | Cours R-Carto"
+  ) +
+  theme_void(base_size = 12) +
+  theme(
+    plot.title      = element_text(face = "bold", size = 14, hjust = 0.5),
+    plot.subtitle   = element_text(color = "grey40", hjust = 0.5),
+    plot.caption    = element_text(color = "grey55", size = 9),
+    legend.position = "right",
+    plot.background = element_rect(fill = "white", color = NA),
+    plot.margin     = margin(10, 20, 10, 20)
+  )
+```
+
+------------------------------------------------------------------------
+
+## Résumé : quelle méthode choisir ? {#sec-summary}
+
+| Méthode | Quand l'utiliser | Attention |
+|----|----|----|
+| **Intervalle égal** | Distribution relativement uniforme | Classes vides si distribution asymétrique |
+| **Quantiles** | Comparer les positions relatives | Peut regrouper des valeurs très différentes |
+| **Jenks** | Usage général, distribution quelconque | Calcul plus long sur grands jeux de données |
+| **Écart-type** | Mettre en évidence les anomalies | Nécessite une distribution proche de la normale |
+| **Valeurs uniques** | Variables catégorielles nominales | Ne pas utiliser pour des données continues |
+
+**Nombre de classes :** entre **5 et 7** pour la plupart des cartes. Au-delà de 12, la lecture devient difficile.
+
+::: callout-tip
+## Règle pratique
+
+Testez toujours **plusieurs méthodes** et choisissez celle qui :
+
+1.  Reflète honnêtement la distribution réelle
+2.  Met en valeur le message géographique souhaité
+3.  Est compréhensible pour votre audience
+
+Les choix cartographiques sont des **choix éditoriaux** — ils ne sont jamais neutres.
+:::
+
+------------------------------------------------------------------------
+
+## Exercice pratique {#sec-exercise}
+
+::: callout-note
+## À vous de jouer !
+
+Avec les données `france_regions` chargées dans ce document :
+
+1.  Cartographiez `part_diplomes` avec **3 méthodes de classification** en `ggplot2`
+2.  Pour chaque carte, justifiez en une phrase pourquoi cette méthode est adaptée (ou non)
+3.  Choisissez la palette la plus appropriée et justifiez votre choix
+4.  Produisez une carte finale complète avec titre, sous-titre, légende et source
+
+**Bonus :** Superposez `densite_pop` en symboles proportionnels sur votre carte finale.
+:::
+
+```{r}
+#| label: exercice
+#| eval: false
+
+# Votre code ici — remplacez les ... par vos paramètres
+diplomes_vec <- france_regions |> st_drop_geometry() |> pull(part_diplomes)
+breaks_ex    <- classIntervals(diplomes_vec, n = 5, style = "...")
+
+france_regions <- france_regions |>
+  mutate(classe_ex = cut(part_diplomes,
+                          breaks = breaks_ex$brks,
+                          include.lowest = TRUE,
+                          dig.lab = 4,
+                          ordered_result = TRUE) |> clean_cut_labels())
+
+ggplot(france_regions) +
+  geom_sf(aes(fill = classe_ex), color = "white", linewidth = 0.4) +
+  scale_fill_brewer(palette = "...", name = "...") +
+  labs(title = "...", subtitle = "...", caption = "...") +
+  theme_void()
+```
+
+------------------------------------------------------------------------
+
+> **← Section précédente : [Introduction à la Cartographie](01_introduction.qmd)** **→ Section suivante : Manipulation d'Objets Vectoriels** *(à venir)*
+
+------------------------------------------------------------------------
+
+*Dr. Elisabetta Pietrostefani — Directrice Adjointe, Geographic Data Science Lab — Université de Liverpool \| Co-Directrice, [Imago : Data Service for Imagery](https://imago.ac.uk/) \| Chercheuse Associée, London School of Economics*
