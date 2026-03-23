@@ -118,6 +118,285 @@ ggplot() +
   )
 ```
 
+------------------------------------------------------------------------
+
+## Données Airbnb : jointure spatiale {#sec-airbnb}
+
+Le fichier `listings.csv` contient les annonces Airbnb parisiennes avec leurs coordonnées. Nous allons reproduire **exactement la même chaîne d'opérations** qu'avec les ventes immobilières à Londres, en décomposant chaque étape.
+
+::: callout-note
+## La chaîne complète en 9 étapes
+
+| Étape | Opération                            | Fonction                     |
+|-------|--------------------------------------|------------------------------|
+| 1     | Lire le CSV                          | `read.csv()`                 |
+| 2     | Identifier les colonnes lon/lat      | `names()` / `head()`         |
+| 3     | Convertir en objet sf                | `st_as_sf()`                 |
+| 4     | Déclarer le SCR (WGS84)              | `st_set_crs(4326)`           |
+| 5     | Reprojeter comme les arrondissements | `st_transform()`             |
+| 6     | Filtrer                              | `filter()`                   |
+| 7     | Jointure spatiale                    | `st_join()`                  |
+| 8     | Agréger                              | `group_by() \|> summarise()` |
+| 9     | Cartographier                        | `ggplot() + geom_sf()`       |
+:::
+
+### Exercice 7 — Étapes 1 à 5 : Charger et spatialiser `listings.csv`
+
+Avant d'écrire une seule ligne de code spatial, on explore toujours le CSV brut pour repérer les colonnes de coordonnées.
+
+```{r}
+#| label: ex7-question
+#| eval: false
+
+# Étape 1 : lire le fichier
+airbnb <- read.csv("data/Paris/airbnb/listings.csv")
+
+# Étape 2 : explorer avant de spatialiser
+# names() liste toutes les colonnes — repérez longitude et latitude
+names(airbnb)
+head(airbnb, 3)
+
+# Dans listings.csv :
+#   colonne 8 → longitude  (direction est-ouest)
+#   colonne 7 → latitude   (direction nord-sud)
+# ATTENTION : st_as_sf() attend toujours LONGITUDE avant LATITUDE → c(8, 7)
+
+# Étape 3 : convertir en objet sf
+airbnb_sf <- st_as_sf(airbnb, coords = c(___, ___))
+
+# Étape 4 : déclarer le SCR — les coordonnées GPS sont toujours en WGS84
+# st_set_crs() DÉCLARE sans modifier les coordonnées
+airbnb_sf <- st_set_crs(airbnb_sf, ___)
+
+# Étape 5 : reprojeter dans le même SCR que PA
+# st_crs(PA) récupère automatiquement le SCR de PA — plus robuste que d'écrire 2154 en dur
+airbnb_sf <- st_transform(airbnb_sf, st_crs(PA))
+
+# Vérification : les deux couches sont-elles maintenant dans le même SCR ?
+st_crs(airbnb_sf) == st_crs(PA)   # doit renvoyer TRUE
+```
+
+::: callout-tip
+## Version condensée en un pipe
+
+Les étapes 3, 4 et 5 peuvent s'enchaîner en un seul pipe :
+
+``` r
+airbnb_sf <- st_as_sf(airbnb, coords = c(8, 7)) |>
+               st_set_crs(4326) |>
+               st_transform(st_crs(PA))
+```
+:::
+
+```{r}
+#| label: ex7-answer
+#| code-fold: true
+#| code-summary: "Voir la réponse"
+#| fig-cap: "Points Airbnb superposés aux arrondissements"
+
+# Étape 1 : lire
+airbnb <- read.csv("data/Paris/airbnb/listings.csv")
+
+# Étapes 2–5 : explorer, convertir, déclarer, reprojeter
+cat("Colonnes lon/lat :", names(airbnb)[c(8, 7)], "\n")
+cat("Nombre d'annonces :", nrow(airbnb), "\n")
+
+airbnb_sf <- st_as_sf(airbnb, coords = c(8, 7)) |>
+  st_set_crs(4326) |>
+  st_transform(st_crs(PA))
+
+# Vérification
+st_crs(airbnb_sf) == st_crs(PA)
+
+# Visualisation — size et alpha petits car beaucoup de points
+ggplot() +
+  geom_sf(data = PA,        fill = "grey95", color = "white", linewidth = 0.4) +
+  geom_sf(data = airbnb_sf, color = "#d7191c", size = 0.3, alpha = 0.3) +
+  labs(
+    title    = "Annonces Airbnb à Paris",
+    subtitle = paste0(format(nrow(airbnb_sf), big.mark = " "), " annonces au total"),
+    caption  = "Source : Inside Airbnb | Cours R-Carto"
+  ) +
+  theme_void(base_size = 12) +
+  theme(
+    plot.title    = element_text(face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(color = "grey40", hjust = 0.5)
+  )
+```
+
+### Exercice 8 — Étapes 6 à 8 : Filtrer, joindre et agréger
+
+On exclut les annonces très chères, puis on associe chaque annonce à son arrondissement via une jointure spatiale, avant d'agréger.
+
+::: callout-important
+## L'ordre des arguments dans `st_join()` est crucial
+
+`st_join(polygones, points)` — le **premier argument** détermine la structure géométrique du résultat. En mettant `PA` en premier, le résultat est un objet avec les géométries des arrondissements, enrichi des attributs des annonces qui y tombent — ce dont on a besoin pour agréger ensuite par arrondissement.
+:::
+
+```{r}
+#| label: ex8-question
+#| eval: false
+
+# Étape 6 : filtrer — garder les annonces < 200 €/nuit
+airbnb_filtre <- filter(airbnb_sf, price < ___)
+
+cat("Annonces conservées :", nrow(airbnb_filtre), "sur", nrow(airbnb_sf), "\n")
+
+# Étape 7 : jointure spatiale
+# Chaque polygone hérite des attributs de tous les points qu'il contient.
+# Résultat : plusieurs lignes par arrondissement (une par annonce).
+airbnb_PA <- st_join(___, ___)   # arrondissements parisiens × annonces
+airbnb_GP <- st_join(___, ___)   # communes Grand Paris × annonces
+
+cat("Lignes après jointure :", nrow(airbnb_PA), "(>> nrow(PA) =", nrow(PA), ")\n")
+
+# Étape 8 : agréger
+# group_by() + summarise() condense en une ligne par arrondissement.
+# .groups = "drop" supprime le groupement après summarise (bonne pratique).
+airbnb_agg <- airbnb_PA |>
+  group_by(c_arinsee, l_aroff) |>
+  summarise(
+    nb_annonces = n(),
+    prix_moyen  = mean(___, na.rm = TRUE),
+    .groups     = "drop"
+  )
+
+cat("Lignes après agrégation :", nrow(airbnb_agg), "(= nrow(PA) =", nrow(PA), ")\n")
+
+head(airbnb_agg)
+```
+
+```{r}
+#| label: ex8-answer
+#| code-fold: true
+#| code-summary: "Voir la réponse"
+
+# Étape 6 : filtrer
+airbnb_filtre <- filter(airbnb_sf, price < 200)
+cat("Annonces conservées :", nrow(airbnb_filtre), "sur", nrow(airbnb_sf), "\n")
+
+# Étape 7 : jointure spatiale (Paris + Grand Paris)
+airbnb_PA <- st_join(PA,         airbnb_filtre)
+airbnb_GP <- st_join(GrandParis, airbnb_filtre)
+
+cat("Lignes après jointure :", nrow(airbnb_PA), "(>> nrow(PA) =", nrow(PA), ")\n")
+
+# Étape 8 : agréger — arrondissements
+airbnb_agg <- airbnb_PA |>
+  group_by(c_arinsee, l_aroff) |>
+  summarise(
+    nb_annonces = n(),
+    prix_moyen  = mean(price, na.rm = TRUE),
+    .groups     = "drop"
+  )
+
+# Étape 8 : agréger — Grand Paris
+airbnb_gp_agg <- airbnb_GP |>
+  group_by(C_DEP) |>
+  summarise(
+    nb_annonces = n(),
+    prix_moyen  = mean(price, na.rm = TRUE),
+    .groups     = "drop"
+  )
+
+cat("Lignes après agrégation :", nrow(airbnb_agg), "(= nrow(PA) =", nrow(PA), ")\n")
+
+airbnb_agg |>
+  st_drop_geometry() |>
+  select(l_aroff, nb_annonces, prix_moyen) |>
+  arrange(desc(prix_moyen)) |>
+  head(8) |>
+  knitr::kable(digits = 0,
+               caption = "Arrondissements classés par prix Airbnb moyen")
+```
+
+### Exercice 9 — Étape 9 : Carte finale avec IRIS en filigrane
+
+On superpose trois couches : le Grand Paris en fond, les arrondissements avec leurs prix, et les IRIS en filigrane pour montrer la structure interne de Paris.
+
+::: callout-tip
+## Pourquoi `limits = prix_range` ?
+
+Sans `limits`, `ggplot2` calcule une échelle de couleur séparée pour chaque `geom_sf()`. La même valeur (ex. 90 €) aurait une couleur différente dans le Grand Paris et dans les arrondissements. `limits = prix_range` force les deux couches à partager la même échelle — indispensable pour une lecture cohérente.
+:::
+
+```{r}
+#| label: ex9-question
+#| eval: false
+
+iris <- read_sf("data/Paris/Polygons/iris.shp") |>
+  filter(dep == "75") |>
+  st_transform(2154)
+
+# Calculer l'étendue commune des prix pour harmoniser la palette
+prix_range <- range(c(airbnb_agg$prix_moyen, airbnb_gp_agg$prix_moyen), na.rm = TRUE)
+
+ggplot() +
+  # Couche 1 : Grand Paris en fond (dessiné en premier = en dessous)
+  geom_sf(data = ___, aes(fill = prix_moyen),
+          color = "white", linewidth = 0.3) +
+  # Couche 2 : arrondissements par-dessus
+  geom_sf(data = ___, aes(fill = ___),
+          color = "white", linewidth = 0.5) +
+  scale_fill_viridis_c(
+    "Prix moyen\n(€/nuit)",
+    direction = -1,
+    limits    = prix_range,   # même échelle pour les deux couches
+    labels    = label_dollar(prefix = "€"),
+    option    = "___"         # essayez "plasma", "magma", "inferno"
+  ) +
+  # Couche 3 : IRIS en filigrane (fill = NA = transparent, juste le contour)
+  geom_sf(data = iris, fill = NA,
+          color = alpha("white", ___), linewidth = 0.12) +   # essayez 0.2 à 0.5
+  labs(title = "___", subtitle = "___", caption = "___") +
+  theme_void()
+```
+
+```{r}
+#| label: ex9-answer
+#| code-fold: true
+#| code-summary: "Voir la réponse"
+#| fig-cap: "Prix moyen Airbnb par arrondissement avec IRIS en fond"
+
+iris <- read_sf("data/Paris/Polygons/iris.shp") |>
+  filter(dep == "75") |>
+  st_transform(2154)
+
+prix_range <- range(c(airbnb_agg$prix_moyen, airbnb_gp_agg$prix_moyen), na.rm = TRUE)
+
+ggplot() +
+  # Couche 1 : Grand Paris en fond
+  geom_sf(data = airbnb_gp_agg, aes(fill = prix_moyen),
+          color = "white", linewidth = 0.3) +
+  # Couche 2 : arrondissements parisiens
+  geom_sf(data = airbnb_agg, aes(fill = prix_moyen),
+          color = "white", linewidth = 0.5) +
+  scale_fill_viridis_c(
+    "Prix moyen\n(€/nuit)",
+    direction = -1,
+    limits    = prix_range,
+    labels    = label_dollar(prefix = "€"),
+    option    = "plasma"
+  ) +
+  # Couche 3 : IRIS en filigrane — alpha faible pour ne pas surcharger
+  geom_sf(data = iris, fill = NA,
+          color = alpha("white", 0.3), linewidth = 0.12) +
+  labs(
+    title    = "Prix moyen Airbnb — Paris et Grand Paris",
+    subtitle = "Annonces < 200 €/nuit | IRIS en filigrane sur Paris",
+    caption  = "Source : Inside Airbnb | Cours R-Carto"
+  ) +
+  theme_void(base_size = 12) +
+  theme(
+    plot.title        = element_text(face = "bold", hjust = 0.5),
+    plot.subtitle     = element_text(color = "grey40", hjust = 0.5),
+    legend.key.height = unit(1.5, "cm")
+  )
+```
+
+------------------------------------------------------------------------
+
 ### Exercice 2 — Charger les données socio-économiques
 
 Chargez le fichier `donnees_arrondissement_enrichi.csv` et examinez sa structure. Ce fichier contient les variables suivantes :
@@ -341,186 +620,6 @@ ggplot() +
   theme(
     plot.title    = element_text(face = "bold", hjust = 0.5),
     plot.subtitle = element_text(color = "grey40", hjust = 0.5)
-  )
-```
-
-------------------------------------------------------------------------
-
-## Données Airbnb : jointure spatiale {#sec-airbnb}
-
-Le fichier `listings.csv` contient les annonces Airbnb parisiennes avec leurs coordonnées. Nous allons reproduire exactement la même chaîne d'opérations qu'avec les ventes immobilières à Londres.
-
-### Exercice 7 — Spatialiser les données Airbnb
-
-```{r}
-#| label: ex7-question
-#| eval: false
-
-airbnb <- read.csv("data/Paris/airbnb/listings.csv")
-names(airbnb)  # repérer les colonnes longitude et latitude
-
-# Créer l'objet sf (longitude = colonne 8, latitude = colonne 7)
-airbnb <- st_as_sf(airbnb, coords = c(___, ___))
-airbnb <- st_set_crs(airbnb, ___)            # WGS84
-airbnb <- st_transform(airbnb, st_crs(PA))   # reprojeter comme PA
-```
-
-```{r}
-#| label: ex7-answer
-#| code-fold: true
-#| code-summary: "Voir la réponse"
-#| fig-cap: "Points Airbnb superposés aux arrondissements"
-
-airbnb <- read.csv("data/Paris/airbnb/listings.csv")
-
-airbnb <- st_as_sf(airbnb, coords = c(8, 7)) |>
-  st_set_crs(4326) |>
-  st_transform(st_crs(PA))
-
-ggplot() +
-  geom_sf(data = PA,     fill = "grey95", color = "white", linewidth = 0.4) +
-  geom_sf(data = airbnb, color = "#d7191c", size = 0.3, alpha = 0.3) +
-  labs(
-    title    = "Annonces Airbnb à Paris",
-    subtitle = paste0(format(nrow(airbnb), big.mark = " "), " annonces"),
-    caption  = "Source : Inside Airbnb | Cours R-Carto"
-  ) +
-  theme_void(base_size = 12) +
-  theme(
-    plot.title    = element_text(face = "bold", hjust = 0.5),
-    plot.subtitle = element_text(color = "grey40", hjust = 0.5)
-  )
-```
-
-### Exercice 8 — Filtrer, joindre et agréger
-
-Filtrez les annonces à moins de 200 €/nuit, faites la jointure spatiale, puis calculez le nombre d'annonces et le prix moyen par arrondissement.
-
-```{r}
-#| label: ex8-question
-#| eval: false
-
-# 1. Filtrer
-airbnb_filtre <- filter(airbnb, price < ___)
-
-# 2. Jointure spatiale
-airbnb_PA <- st_join(___, ___)
-
-# 3. Agréger
-airbnb_agg <- airbnb_PA |>
-  group_by(c_arinsee, l_aroff) |>
-  summarise(
-    nb_annonces = n(),
-    prix_moyen  = mean(___, na.rm = TRUE)
-  )
-
-head(airbnb_agg)
-```
-
-```{r}
-#| label: ex8-answer
-#| code-fold: true
-#| code-summary: "Voir la réponse"
-
-airbnb_filtre <- filter(airbnb, price < 200)
-
-# Jointure sur les arrondissements parisiens
-airbnb_PA <- st_join(PA, airbnb_filtre)
-
-# Jointure sur le Grand Paris (communes limitrophes)
-airbnb_GP <- st_join(GrandParis, airbnb_filtre)
-
-# Agréger — arrondissements
-airbnb_agg <- airbnb_PA |>
-  group_by(c_arinsee, l_aroff) |>
-  summarise(
-    nb_annonces = n(),
-    prix_moyen  = mean(price, na.rm = TRUE),
-    .groups     = "drop"
-  )
-
-# Agréger — Grand Paris
-airbnb_gp_agg <- airbnb_GP |>
-  group_by(C_DEP) |>
-  summarise(
-    nb_annonces = n(),
-    prix_moyen  = mean(price, na.rm = TRUE),
-    .groups     = "drop"
-  )
-
-airbnb_agg |> st_drop_geometry() |>
-  select(l_aroff, nb_annonces, prix_moyen) |>
-  arrange(desc(prix_moyen)) |>
-  head(8) |>
-  knitr::kable(digits = 0,
-               caption = "Arrondissements classés par prix Airbnb moyen")
-```
-
-### Exercice 9 — Carte finale Airbnb
-
-Cartographiez le prix moyen Airbnb avec les IRIS en fond de sous-quartiers.
-
-```{r}
-#| label: ex9-question
-#| eval: false
-
-iris <- read_sf("data/Paris/Polygons/iris.shp") |>
-  filter(dep == "75") |>
-  st_transform(2154)
-
-ggplot() +
-  geom_sf(data = ___, aes(fill = ___),
-          color = "white", linewidth = 0.5) +
-  scale_fill_viridis(___, direction = -1,
-                     labels = label_dollar(prefix = "€"),
-                     option = "___") +
-  geom_sf(data = iris, fill = NA,
-          color = alpha("white", 0.4), linewidth = 0.15) +
-  labs(title = "___", caption = "___") +
-  theme_void()
-```
-
-```{r}
-#| label: ex9-answer
-#| code-fold: true
-#| code-summary: "Voir la réponse"
-#| fig-cap: "Prix moyen Airbnb par arrondissement avec IRIS en fond"
-
-iris <- read_sf("data/Paris/Polygons/iris.shp") |>
-  filter(dep == "75") |>
-  st_transform(2154)
-
-# Harmoniser les plages de prix entre les deux couches
-prix_range <- range(c(airbnb_agg$prix_moyen, airbnb_gp_agg$prix_moyen),
-                    na.rm = TRUE)
-
-ggplot() +
-  # Grand Paris en fond avec sa propre valeur
-  geom_sf(data = airbnb_gp_agg, aes(fill = prix_moyen),
-          color = "white", linewidth = 0.3) +
-  # Arrondissements par-dessus
-  geom_sf(data = airbnb_agg, aes(fill = prix_moyen),
-          color = "white", linewidth = 0.5) +
-  scale_fill_viridis_c(
-    "Prix moyen\n(€/nuit)",
-    direction = -1,
-    limits    = prix_range,
-    labels    = label_dollar(prefix = "€"),
-    option    = "plasma"
-  ) +
-  # IRIS en filigrane sur Paris uniquement
-  geom_sf(data = iris, fill = NA,
-          color = alpha("white", 0.3), linewidth = 0.12) +
-  labs(
-    title    = "Prix moyen Airbnb — Paris et Grand Paris",
-    subtitle = "Annonces < 200 €/nuit | IRIS en filigrane sur Paris",
-    caption  = "Source : Inside Airbnb | Cours R-Carto"
-  ) +
-  theme_void(base_size = 12) +
-  theme(
-    plot.title        = element_text(face = "bold", hjust = 0.5),
-    plot.subtitle     = element_text(color = "grey40", hjust = 0.5),
-    legend.key.height = unit(1.5, "cm")
   )
 ```
 
