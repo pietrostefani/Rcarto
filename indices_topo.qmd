@@ -26,14 +26,15 @@ execute:
 
 Dans le chapitre [Données Raster](raster.qmd), nous avons vu ce qu'est un raster, les grands types de données (MNT, images multispectrales, nightlights), le compromis résolution spatiale/temporelle, et les principales sources d'imagerie. Ce chapitre part de là pour se concentrer entièrement sur les **Modèles Numériques de Terrain** : comment les obtenir, les charger, et en extraire des indices topographiques utiles.
 
-Les quatre opérations couvertes sur un MNT du Liban :
+Les cinq opérations couvertes sur un MNT du Liban :
 
-| Opération           | Fonction `terra`    |
-|---------------------|---------------------|
-| Charger et explorer | `rast()`            |
-| Recadrer et masquer | `crop()` + `mask()` |
-| Calculer la pente   | `terrain()`         |
-| Reclassifier        | `classify()`        |
+| Opération                         | Fonction            |
+|-----------------------------------|---------------------|
+| Charger et explorer               | `rast()`            |
+| Recadrer et masquer               | `crop()` + `mask()` |
+| Calculer la pente                 | `terrain()`         |
+| Reclassifier                      | `classify()`        |
+| Extraire vers des données vecteur | `terra::extract()`  |
 
 À la fin, vous reproduirez ces étapes sur la **Corse** en exercice indépendant.
 
@@ -492,10 +493,161 @@ ggplot() +
 
 ------------------------------------------------------------------------
 
+## Étape 5 — Extraction vers des données vectorielles {#sec-extract}
+
+Les étapes précédentes produisent des rasters. Mais en pratique, on veut souvent **extraire des valeurs raster à des emplacements précis** — des points d'enquête, des communes, des bassins versants — pour les analyser statistiquement ou les cartographier dans un cadre vectoriel `sf`.
+
+`terra::extract()` fait exactement cela : pour chaque géométrie vecteur (point ou polygone), il identifie les cellules raster correspondantes et renvoie leurs valeurs.
+
+### Extraction à des points
+
+```{r}
+#| label: extract-points
+#| eval: false
+
+# Charger des données d'enquête géolocalisées
+# (points représentant des ménages au Liban)
+households <- read_sf("data/Lebanon/random_survey_LBN.shp")
+
+# terra::extract() trouve pour chaque point la cellule raster
+# qui le contient et renvoie sa valeur.
+# Le MNT dem (chargé à l'étape 1) est utilisé directement.
+households_elevation <- terra::extract(dem, vect(households))
+# vect() convertit l'objet sf en SpatVector, requis par terra
+
+head(households_elevation)
+```
+
+::: callout-important
+## Harmoniser les SCR avant l'extraction
+
+Si vos données vecteur et votre raster ne sont pas dans le même SCR, `terra::extract()` tentera une transformation automatique mais affichera un avertissement :
+
+```         
+Warning: [extract] transforming vector data to the CRS of the raster
+```
+
+Ne laissez pas cette transformation se faire silencieusement — reprojetez explicitement avec `st_transform()` (pour sf) ou `project()` (pour terra) **avant** l'extraction. Si vous obtenez des `NA` à la place de valeurs, c'est presque toujours un problème de SCR.
+
+```{r}
+#| eval: false
+
+# Vérifier les SCR
+st_crs(households)$srid
+crs(dem, describe = TRUE)$code
+
+# Reprojeter les points dans le SCR du raster
+households <- st_transform(households, crs(dem))
+
+# Ou reprojeter le raster dans le SCR des points (plus coûteux)
+dem_reproj <- terra::project(dem, "EPSG:4326")
+```
+:::
+
+```{r}
+#| label: extract-attach
+#| eval: false
+
+# Attacher les altitudes extraites au data frame d'origine
+# cbind() ajoute la colonne en conservant la géométrie sf
+households <- cbind(households, households_elevation)
+
+# Vérifier le résultat
+head(households)
+```
+
+Le résultat ressemble à ceci — une colonne d'altitude ajoutée pour chaque point :
+
+```         
+Simple feature collection with 6 features and 3 fields
+Geometry type: POINT
+Dimension:     XY
+Bounding box:  xmin: 35.69817 ymin: 33.72841 xmax: 36.17128 ymax: 34.33229
+Geodetic CRS:  WGS 84
+  id ID LBN_elevation_w_bathymetry                  geometry
+1  0  1                   878.1839 POINT (35.90386 33.72841)
+2  1  2                  1558.2007 POINT (36.17128 34.20268)
+3  2  3                  1096.7252 POINT (35.81425 34.19914)
+4  3  4                  1251.2185 POINT (36.03916 34.06442)
+5  4  5                    986.273  POINT (35.69817 34.04050)
+6  5  6                  1323.2316 POINT (35.98001 34.33229)
+```
+
+### Extraction à des polygones (statistiques zonales)
+
+Pour des polygones (gouvernorats, communes, bassins versants), `terra::extract()` renvoie toutes les valeurs des cellules dont le centroïde tombe dans le polygone. On les agrège ensuite avec `fun = mean` (ou toute autre fonction).
+
+```{r}
+#| label: extract-polygons
+#| eval: false
+
+# Charger les gouvernorats du Liban (déjà utilisés à l'étape 2)
+Lebanon <- read_sf("data/Liban/LBN_adm1.shp")
+
+# Harmoniser le SCR
+Lebanon <- st_transform(Lebanon, crs(dem))
+
+# Extraire l'altitude moyenne par gouvernorat
+# fun = mean agrège directement → une ligne par polygone
+# bind = TRUE conserve les attributs originaux du vecteur
+gov_elevation <- terra::extract(dem, vect(Lebanon),
+                                  fun   = mean,
+                                  na.rm = TRUE,
+                                  bind  = TRUE) |>
+  st_as_sf()
+
+head(gov_elevation |> st_drop_geometry() |>
+       select(NAME_1, LBN_elevation_w_bathymetry))
+```
+
+::: callout-tip
+## `terra::extract()` vs `exactextractr::exact_extract()`
+
+Pour un MNT à 1 m ou 5 m avec de nombreux polygones, `exactextractr::exact_extract()` est **nettement plus rapide** et gère les cellules partiellement couvertes en les pondérant par leur fraction de surface :
+
+```{r}
+#| eval: false
+
+# install.packages("exactextractr")
+library(exactextractr)
+
+gov_elevation_exact <- exact_extract(dem, Lebanon, "mean",
+                                      progress = FALSE)
+Lebanon$alt_moy <- gov_elevation_exact
+```
+
+Voir le script `rgealti_extraction.R` pour une comparaison complète des deux méthodes.
+:::
+
+### Visualiser les points extraits
+
+```{r}
+#| label: fig-extract-points
+#| fig-cap: "Altitude extraite du MNT aux points d'enquête — Liban"
+#| eval: false
+
+ggplot() +
+  geom_spatraster(data = dem_liban) +
+  scale_fill_gradientn(colors   = hcl.colors(50, "Terrain"),
+                        name     = "Altitude (m)",
+                        na.value = "transparent") +
+  geom_sf(data = households,
+          aes(color = LBN_elevation_w_bathymetry),
+          size = 3, shape = 21, fill = "white", stroke = 1.2) +
+  scale_color_viridis_c(option = "plasma", name = "Altitude\nextraite (m)") +
+  geom_sf(data = Lebanon, fill = NA, color = "white", linewidth = 0.5) +
+  labs(title   = "Extraction du MNT aux points d'enquête",
+       caption = "Source : SRTM / données enquête | Cours R-Carto") +
+  theme_void(base_size = 12) +
+  theme(plot.title = element_text(face = "bold", hjust = 0.5))
+```
+
+------------------------------------------------------------------------
+
 ## Récapitulatif {#sec-summary}
 
 ::: callout-note
-## Les 4 opérations raster essentielles
+## Les 5 opérations raster essentielles
 
 ``` r
 # 1. Charger
@@ -510,6 +662,13 @@ slope <- terrain(dem_proj, v = "slope", unit = "degrees")
 # 4. Reclassifier
 rcl   <- matrix(c(0, 10, 1, 10, Inf, 0), ncol = 3, byrow = TRUE)
 zones <- classify(dem, rcl)
+
+# 5. Extraire vers des données vectorielles
+pts_sf    <- st_transform(pts_sf, crs(dem))           # harmoniser les SCR
+alt_pts   <- terra::extract(dem, vect(pts_sf))         # extraction ponctuelle
+poly_mean <- terra::extract(dem, vect(poly_sf),        # extraction polygonale
+                             fun = mean, na.rm = TRUE,
+                             bind = TRUE) |> st_as_sf()
 ```
 
 Pour assembler des tuiles : `mosaic(t1, t2, t3, t4, fun = "mean")`
