@@ -24,9 +24,9 @@ execute:
 
 ## Introduction {#sec-intro}
 
-Dans les chapitres précédents, nous avons travaillé avec des données **vectorielles**. Ce chapitre introduit les opérations fondamentales sur les données **raster**, en travaillant sur un MNT (*Modèle Numérique de Terrain*) du Liban.
+Dans le chapitre [Données Raster](raster.qmd), nous avons vu ce qu'est un raster, les grands types de données (MNT, images multispectrales, nightlights), le compromis résolution spatiale/temporelle, et les principales sources d'imagerie. Ce chapitre part de là pour se concentrer entièrement sur les **Modèles Numériques de Terrain** : comment les obtenir, les charger, et en extraire des indices topographiques utiles.
 
-Les quatre opérations couvertes :
+Les quatre opérations couvertes sur un MNT du Liban :
 
 | Opération           | Fonction `terra`    |
 |---------------------|---------------------|
@@ -36,6 +36,289 @@ Les quatre opérations couvertes :
 | Reclassifier        | `classify()`        |
 
 À la fin, vous reproduirez ces étapes sur la **Corse** en exercice indépendant.
+
+------------------------------------------------------------------------
+
+------------------------------------------------------------------------
+
+## Obtenir des données d'altitude {#sec-dem-sources}
+
+Trois grandes familles de sources couvrent les besoins selon l'étendue géographique et la résolution souhaitée : les données globales de la NASA (SRTM, ASTER GDEM, NASADEM), les données françaises de haute précision de l'IGN (RGE ALTI®), et les tuiles accessibles directement depuis R via le package `elevatr`.
+
+### Comparaison des principales sources
+
+| Source | Résolution | Couverture | Accès | Usage typique |
+|----|----|----|----|----|
+| **SRTM** (NASA) | \~30 m (1 arc-sec) | Mondial (60°N–56°S) | Libre | Analyse topographique générale |
+| **ASTER GDEM v3** | \~30 m | Mondial (83°N–83°S) | Libre | Zones hors couverture SRTM |
+| **NASADEM** | \~30 m | Mondial (60°N–56°S) | Libre | SRTM retraité, moins de vides |
+| **RGE ALTI® IGN** | **1 m** | France entière | Libre | Analyses fines, zones inondables |
+| **NextGIS / SRTM France** | \~30 m | France | Libre | Téléchargement rapide, prêt à l'emploi |
+| **AWS Terrain Tiles** | Variable (zoom 1–14) | Mondial | Via `elevatr` | Import direct dans R sans compte |
+
+------------------------------------------------------------------------
+
+### Option 1 — NASA Earthdata : SRTM, ASTER GDEM, NASADEM
+
+La NASA distribue plusieurs MNT mondiaux librement accessibles après création d'un compte gratuit sur [Earthdata](https://www.earthdata.nasa.gov/topics/land-surface/digital-elevation-terrain-model-dem).
+
+::: callout-note
+## Les trois produits NASA à connaître
+
+**SRTM** (*Shuttle Radar Topography Mission*, 2000) — collecté en 11 jours par la navette spatiale Endeavour, il couvre 80 % de la surface terrestre à \~30 m de résolution. C'est la référence mondiale pour la plupart des analyses topographiques.
+
+**ASTER GDEM v3** — produit à partir de plus d'un million d'images stéréoscopiques du satellite Terra (NASA/METI), il couvre 99 % de la surface terrestre jusqu'à 83° de latitude. Résolution nominale de 30 m, mais précision réelle légèrement inférieure au SRTM dans les zones nuageuses.
+
+**NASADEM** — retraitement amélioré du SRTM intégrant des données ASTER GDEM, ICESat et ALOS pour combler les vides et améliorer la précision verticale. À privilégier par rapport au SRTM brut pour les nouvelles analyses.
+:::
+
+Les données sont distribuées en tuiles de 1° × 1° au format GeoTIFF. Une fois téléchargées, on les charge et assemble directement avec `terra` :
+
+```{r}
+#| label: nasa-dem-load
+#| eval: false
+
+library(terra)
+library(tidyterra)
+library(ggplot2)
+
+# Après téléchargement manuel depuis https://earthdata.nasa.gov
+# Les fichiers SRTM ont la convention de nommage : N48E002.SRTMGL1.hgt.zip
+# Les fichiers NASADEM : NASADEM_HGT_n48e002.zip
+
+# Charger une tuile SRTM décompressée
+srtm_tuile <- rast("data/DEM/N48E002.hgt")
+
+cat("Résolution :", res(srtm_tuile), "degrés (~30 m)\n")
+cat("Étendue    :", as.character(ext(srtm_tuile)), "\n")
+
+# Assembler plusieurs tuiles avec mosaic()
+# (nécessaire si la zone d'intérêt couvre plusieurs tuiles)
+t1 <- rast("data/DEM/N48E001.hgt")
+t2 <- rast("data/DEM/N48E002.hgt")
+t3 <- rast("data/DEM/N49E001.hgt")
+t4 <- rast("data/DEM/N49E002.hgt")
+
+dem_mosaic <- mosaic(t1, t2, t3, t4, fun = "mean")
+
+ggplot() +
+  geom_spatraster(data = dem_mosaic) +
+  scale_fill_gradientn(colors   = hcl.colors(50, "Terrain"),
+                        name     = "Altitude (m)",
+                        na.value = "transparent") +
+  labs(title   = "MNT SRTM assemblé",
+       caption = "Source : NASA SRTM | Earthdata") +
+  theme_void(base_size = 12) +
+  theme(plot.title = element_text(face = "bold", hjust = 0.5))
+```
+
+------------------------------------------------------------------------
+
+### Option 2 — RGE ALTI® : le MNT 1 m de l'IGN pour la France
+
+Pour les analyses sur la France, le [RGE ALTI®](https://geoservices.ign.fr/rgealti) de l'IGN est la source de référence. Il décrit l'altitude de la surface du sol à **1 mètre de résolution** sur l'ensemble du territoire métropolitain et des DOM-TOM, avec une précision verticale de 20 cm dans les zones inondables et littorales.
+
+::: callout-tip
+## Comment télécharger le RGE ALTI®
+
+1.  Rendez-vous sur [geoservices.ign.fr/rgealti](https://geoservices.ign.fr/rgealti)
+2.  Créez un compte gratuit sur le Géoportail de l'IGN
+3.  Sélectionnez le département ou la région souhaités
+4.  Choisissez le format **GeoTIFF** et la résolution **1 m** ou **5 m**
+5.  Les fichiers sont distribués par dalles (tuiles) — utilisez `mosaic()` pour les assembler
+
+Le RGE ALTI® à 1 m est aussi accessible via l'[API flux WCS de l'IGN](https://geoservices.ign.fr/documentation/services/api-et-services-ogc/images-wcs) pour une extraction directe par emprise.
+:::
+
+```{r}
+#| label: rgealti-load
+#| eval: false
+
+# Après téléchargement depuis geoservices.ign.fr/rgealti
+# Structure typique des fichiers IGN :
+#   RGEALTI_2-0_1M_ASC_LAMB93-IGN69_D075_2021-01-01/
+#     RGEALTI_FXX_0630_6860_MNT_LAMB93_IGN69.asc   ← tuiles ASCII Grid
+#   ou format GeoTIFF selon la version téléchargée
+
+# Charger une tuile GeoTIFF
+ign_tuile <- rast("data/IGN/RGEALTI_FXX_0630_6860_MNT_LAMB93_IGN69.tif")
+
+cat("SCR        :", crs(ign_tuile, describe = TRUE)$name, "\n")  # Lambert-93
+cat("Résolution :", res(ign_tuile), "mètres\n")                   # 1 m × 1 m
+cat("Min / Max  :", global(ign_tuile, "range", na.rm = TRUE)[[1]], "m\n")
+
+# Le RGE ALTI® est déjà en Lambert-93 (EPSG:2154) — aucune reprojection nécessaire
+# pour les analyses sur la France
+
+# Si les fichiers sont au format ASCII Grid (.asc), terra les lit de la même façon
+ign_asc <- rast("data/IGN/RGEALTI_FXX_0630_6860_MNT_LAMB93_IGN69.asc")
+
+# Assembler plusieurs dalles
+dalles <- list.files("data/IGN/", pattern = "\\.tif$", full.names = TRUE)
+dem_ign <- do.call(mosaic, c(lapply(dalles, rast), list(fun = "mean")))
+
+ggplot() +
+  geom_spatraster(data = dem_ign) +
+  scale_fill_gradientn(colors   = hcl.colors(50, "Terrain"),
+                        name     = "Altitude (m)",
+                        na.value = "transparent") +
+  labs(title   = "RGE ALTI® IGN — résolution 1 m",
+       caption = "Source : IGN — RGE ALTI® | geoservices.ign.fr") +
+  theme_void(base_size = 12) +
+  theme(plot.title = element_text(face = "bold", hjust = 0.5))
+```
+
+------------------------------------------------------------------------
+
+### Option 3 — NextGIS : SRTM France prêt à l'emploi
+
+[NextGIS](https://data.nextgis.com/en/region/FR/dem/) propose des MNT SRTM préconfigurés par pays, directement téléchargeables au format GeoTIFF sans création de compte. C'est l'option la plus rapide pour obtenir un MNT de la France entière à \~30 m de résolution.
+
+```{r}
+#| label: nextgis-load
+#| eval: false
+
+# Après téléchargement depuis https://data.nextgis.com/en/region/FR/dem/
+# Le fichier est un GeoTIFF unique couvrant toute la France
+
+dem_france <- rast("data/nextgis/dem.tif")
+
+cat("SCR        :", crs(dem_france, describe = TRUE)$name, "\n")
+cat("Résolution :", res(dem_france), "\n")
+cat("Min / Max  :", global(dem_france, "min", na.rm = TRUE)[[1]], "/",
+                    global(dem_france, "max", na.rm = TRUE)[[1]], "m\n")
+
+# Reprojeter en Lambert-93 pour les analyses sur la France
+dem_france_l93 <- project(dem_france, "EPSG:2154")
+
+ggplot() +
+  geom_spatraster(data = dem_france_l93) +
+  scale_fill_gradientn(colors   = hcl.colors(50, "Terrain"),
+                        name     = "Altitude (m)",
+                        na.value = "transparent") +
+  labs(title   = "MNT France — SRTM via NextGIS",
+       caption = "Source : NextGIS / SRTM | data.nextgis.com") +
+  theme_void(base_size = 12) +
+  theme(plot.title = element_text(face = "bold", hjust = 0.5))
+```
+
+------------------------------------------------------------------------
+
+### Option 4 — `elevatr` : import direct depuis R sans téléchargement manuel
+
+Le package `elevatr` permet de récupérer des données d'altitude directement depuis R, sans passer par un navigateur. Il interroge les tuiles AWS Terrain (synthèse SRTM/3DEP/GMTED2010) ou l'API OpenTopography, et renvoie un objet `terra` prêt à l'emploi.
+
+```{r}
+#| label: elevatr-install
+#| eval: false
+
+install.packages("elevatr")
+```
+
+```{r}
+#| label: elevatr-demo
+#| eval: false
+
+library(elevatr)
+library(sf)
+library(terra)
+library(tidyterra)
+library(ggplot2)
+library(rnaturalearth)
+
+# elevatr accepte un objet sf comme emprise — on utilise la France métropolitaine
+france <- ne_countries(country = "France", returnclass = "sf") |>
+  st_transform(4326)
+
+# get_elev_raster() télécharge les tuiles couvrant l'emprise de l'objet sf
+# z = niveau de zoom (1 à 14) — z = 5 ≈ ~5 km, z = 8 ≈ ~600 m, z = 10 ≈ ~150 m
+# src = "aws"  → tuiles AWS (SRTM + 3DEP + GMTED2010, pas de compte requis)
+# src = "gl1"  → SRTM 1 arc-sec (~30 m) via OpenTopography (clé API requise)
+# src = "alos" → ALOS World 3D (~30 m) via OpenTopography (clé API requise)
+
+dem_fr <- get_elev_raster(locations = france, z = 6, src = "aws",
+                           clip = "locations")   # découper sur le contour exact
+
+# Convertir en SpatRaster terra et reprojeter
+dem_fr_terra <- rast(dem_fr)
+dem_fr_l93   <- project(dem_fr_terra, "EPSG:2154")
+
+cat("Résolution après reprojection :", res(dem_fr_l93), "mètres\n")
+
+ggplot() +
+  geom_spatraster(data = dem_fr_l93) +
+  scale_fill_gradientn(colors   = hcl.colors(50, "Terrain"),
+                        name     = "Altitude (m)",
+                        na.value = "transparent") +
+  labs(title   = "MNT France — elevatr (AWS Terrain Tiles, z = 6)",
+       caption = "Source : AWS Terrain Tiles via elevatr | Cours R-Carto") +
+  theme_void(base_size = 12) +
+  theme(plot.title = element_text(face = "bold", hjust = 0.5))
+```
+
+::: callout-tip
+## Choisir le bon niveau de zoom (`z`)
+
+| `z`   | Résolution approx. | Usage                              |
+|-------|--------------------|------------------------------------|
+| 4–5   | 5–10 km            | Vue continentale, aperçu rapide    |
+| 6–7   | 1–5 km             | Pays entier, analyses régionales   |
+| 8–9   | 300–600 m          | Région, département                |
+| 10–11 | 75–150 m           | Zone d'étude locale                |
+| 12–14 | 10–40 m            | Analyse fine (fichiers volumineux) |
+
+Plus le zoom est élevé, plus les fichiers sont lourds et le téléchargement lent. Pour une première exploration, commencez par `z = 6` ou `z = 7`.
+:::
+
+```{r}
+#| label: elevatr-opentopo
+#| eval: false
+
+# Avec OpenTopography (clé API gratuite requise)
+# Créer un compte sur https://portal.opentopography.org/newUser
+# puis récupérer votre clé dans myOpenTopo → API Key
+
+# Enregistrer la clé une fois pour toutes dans votre .Renviron :
+# usethis::edit_r_environ()
+# → ajouter la ligne : OPENTOPO_KEY=votre_cle_ici
+
+# Télécharger le SRTM 1 arc-sec (~30 m) pour une zone précise
+corsica <- ne_states(country = "France", returnclass = "sf") |>
+  dplyr::filter(name == "Corse-du-Sud" | name == "Haute-Corse") |>
+  st_transform(4326)
+
+dem_corse_gl1 <- get_elev_raster(locations = corsica,
+                                  src  = "gl1",       # SRTM 1 arc-sec
+                                  clip = "locations") # découper sur la Corse
+
+dem_corse_terra <- rast(dem_corse_gl1) |>
+  project("EPSG:2154")
+
+ggplot() +
+  geom_spatraster(data = dem_corse_terra) +
+  scale_fill_gradientn(colors   = hcl.colors(50, "Terrain"),
+                        name     = "Altitude (m)",
+                        na.value = "transparent") +
+  labs(title   = "MNT Corse — SRTM 1 arc-sec via OpenTopography",
+       caption = "Source : OpenTopography / SRTM GL1 | Cours R-Carto") +
+  theme_void(base_size = 12) +
+  theme(plot.title = element_text(face = "bold", hjust = 0.5))
+```
+
+::: callout-note
+## Sources disponibles via OpenTopography dans `elevatr`
+
+| `src`          | Produit                       | Résolution |
+|----------------|-------------------------------|------------|
+| `"gl3"`        | SRTM 3 arc-sec                | \~90 m     |
+| `"gl1"`        | SRTM 1 arc-sec                | \~30 m     |
+| `"alos"`       | ALOS World 3D                 | \~30 m     |
+| `"srtm15plus"` | SRTM 15 arc-sec + bathymétrie | \~450 m    |
+
+L'option `"alos"` (satellite japonais ALOS) peut être plus précise que le SRTM dans les zones montagneuses tropicales ou très boisées.
+:::
+
+------------------------------------------------------------------------
 
 ```{r}
 #| label: setup
@@ -261,11 +544,37 @@ La Corse présente une topographie contrastée similaire au Liban : côte médit
 
 ------------------------------------------------------------------------
 
+## Pour aller plus loin : classification supervisée {#sec-classification}
+
+Une fois les bases raster maîtrisées, l'étape suivante est de **transformer des pixels en catégories** — cartographier l'occupation du sol, distinguer l'urbain du rural, identifier les cultures. C'est le domaine de la **classification supervisée**.
+
+Le principe : chaque pixel d'une image multispectrale possède une **signature spectrale** — une empreinte de la façon dont il réfléchit la lumière dans chaque bande. La classification supervisée consiste à entraîner un algorithme à reconnaître ces empreintes à partir d'exemples labelisés (*points d'entraînement*), puis à appliquer le modèle à l'ensemble de l'image.
+
+::: callout-note
+## La chaîne de classification en six étapes
+
+1.  **Définir les classes** — urbain, péri-urbain, agriculture, forêt, eau…
+2.  **Collecter des points d'entraînement** — idéalement 50 à 200+ exemples par classe
+3.  **Extraire les valeurs spectrales** aux emplacements d'entraînement
+4.  **Entraîner un classifieur** — Forêt Aléatoire, SVM, Maximum de Vraisemblance…
+5.  **Appliquer à l'image complète** — chaque pixel reçoit un label
+6.  **Valider** — réserver un jeu de test, calculer la matrice de confusion et les métriques de précision
+
+*Le pipeline est simple. Les choix méthodologiques à l'intérieur ne le sont pas.*
+:::
+
+Les bandes infrarouge (PIR, SWIR) sont particulièrement utiles pour la distinction urbain/rural : la végétation saine réfléchit fortement le PIR tandis que les surfaces imperméables ne le font pas. Les frontières péri-urbaines restent cependant notoriellement difficiles à classifier avec précision.
+
+------------------------------------------------------------------------
+
 ## Liens utiles {#sec-links}
 
 -   [terra documentation](https://rspatial.org/terra/)
 -   [tidyterra](https://dieghernan.github.io/tidyterra/)
 -   [Geocomputation with R — Raster operations](https://geocompr.robinlovelace.net/spatial-operations.html#spatial-ras)
+-   [OpenTopography](https://opentopography.org/) — MNT haute résolution (LiDAR, SRTM, ALOS)
+-   [USGS Earth Explorer](https://earthexplorer.usgs.gov/) — Landsat, MODIS et archives NASA
+-   [Copernicus Open Access Hub](https://scihub.copernicus.eu/) — Sentinel-1, 2, 3, 5P (ESA)
 
 ------------------------------------------------------------------------
 

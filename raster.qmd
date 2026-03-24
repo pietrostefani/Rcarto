@@ -49,7 +49,7 @@ library(terra)
 
 ------------------------------------------------------------------------
 
-## Qu'est-ce qu'un raster ? {#sec-what}
+## Une grille régulière de cellules {#sec-what}
 
 Un raster est une **grille régulière de cellules (pixels)**, chacune portant une valeur numérique. C'est exactement la même structure qu'une photographie numérique — sauf que chaque pixel correspond à une zone précise sur la surface terrestre.
 
@@ -96,11 +96,81 @@ ggplot(volcano_df, aes(x = x, y = y, fill = altitude)) +
   )
 ```
 
-**Trois propriétés définissent un raster géographique :**
+------------------------------------------------------------------------
 
--   **Emprise** (*extent*) — la zone couverte (xmin, xmax, ymin, ymax)
--   **Résolution** — la taille d'un pixel (ex. 30m × 30m pour Landsat)
--   **SCR** — le système de coordonnées de référence
+## Qu'est-ce qu'un raster ? {#sec-concept}
+
+Un raster est une **grille régulière de pixels** — chaque cellule couvre une zone précise sur la surface terrestre et contient une valeur numérique unique. C'est exactement la même structure qu'une photographie numérique, à ceci près que chaque pixel est géoréférencé.
+
+Trois propriétés définissent tout raster géographique :
+
+| Propriété | Description | Exemple |
+|----|----|----|
+| **Emprise** (*extent*) | Zone géographique couverte | xmin, xmax, ymin, ymax |
+| **Résolution spatiale** | Taille d'un pixel au sol | 30 m × 30 m (Landsat) |
+| **SCR** | Système de coordonnées de référence | WGS84, Lambert-93 |
+
+Les valeurs peuvent représenter des phénomènes **continus** (altitude, température, intensité lumineuse) ou des variables **catégorielles** (type d'occupation du sol, classe de végétation).
+
+### Les grands types de données raster
+
+**Rasters à une bande (grayscale)**
+
+Le cas le plus simple : une seule bande où la valeur du pixel encode une magnitude. C'est le format des MNT, des données de luminosité nocturne, ou de la rétrodiffusion radar.
+
+Les **données de lumières nocturnes** (*nightlights*) en sont un exemple parlant : chaque pixel représente la radiance ou la luminance artificielle mesurée depuis l'espace. Les zones sombres correspondent à une faible activité humaine ; les zones brillantes trahissent l'urbanisation, les axes routiers, les zones industrielles. Ces données servent à suivre l'étalement urbain, évaluer la pollution lumineuse, ou approcher l'activité économique dans des régions où les statistiques officielles sont lacunaires.
+
+**Modèles Numériques de Terrain (MNT)**
+
+Chaque pixel vaut l'**altitude au-dessus du niveau de la mer** à cet endroit. Les MNT sont la matière première de l'analyse topographique — ils servent à calculer la pente, l'exposition, la courbure, les bassins versants, les zones inondables, et bien d'autres indices. Le chapitre suivant, [Indices Topographiques](indices_topo.qmd), couvre ces opérations en détail et explique comment obtenir des données d'altitude pour n'importe quelle zone d'étude.
+
+::: callout-note
+## Des MNT aux produits dérivés
+
+À partir d'un seul MNT, on peut calculer :
+
+-   **Pente** (`terrain(v = "slope")`) — inclinaison du terrain en degrés
+-   **Exposition** (`terrain(v = "aspect")`) — orientation des versants (N, S, E, O)
+-   **Courbure** — concavité/convexité de la surface
+-   **TRI** (*Terrain Ruggedness Index*) — rugosité topographique
+-   **Ombrage** (*hillshade*) — effet d'éclairage directionnel pour la visualisation
+:::
+
+**Images multispectrales**
+
+L'œil humain perçoit trois bandes (rouge, vert, bleu). Les capteurs satellitaires capturent **4 à 12 bandes ou plus** couvrant l'ensemble du spectre électromagnétique — du visible à l'infrarouge thermique. Chaque bande supplémentaire révèle quelque chose d'**invisible à l'œil nu** : santé de la végétation, humidité du sol, température de surface, composition minérale.
+
+Le tableau ci-dessous détaille les bandes du satellite **Landsat 8/9**, l'archive la plus utilisée en télédétection open source :
+
+| Bande | Nom | Longueur d'onde | Résolution | Utilisation principale |
+|----|----|----|----|----|
+| 1 | Ultra Bleu (Côtier/Aérosol) | 0,43–0,45 µm | 30 m | Eaux côtières, aérosols |
+| 2 | Bleu | 0,45–0,51 µm | 30 m | Profondeur de l'eau, distinction sol/végétation |
+| 3 | Vert | 0,53–0,59 µm | 30 m | Réflectance maximale de la végétation |
+| 4 | Rouge | 0,64–0,67 µm | 30 m | Absorption de la chlorophylle |
+| 5 | Proche Infrarouge (PIR) | 0,85–0,88 µm | 30 m | Biomasse, santé de la végétation |
+| 6 | SWIR-1 | 1,57–1,65 µm | 30 m | Humidité du sol, neige vs nuages |
+| 7 | SWIR-2 | 2,11–2,29 µm | 30 m | Géologie, minéralogie, cicatrices de feux |
+| 8 | Panchromatique | 0,50–0,68 µm | **15 m** | Haute résolution en niveaux de gris |
+| 10–11 | Infrarouge Thermique | 10,6–12,5 µm | 100 m | Température de surface |
+
+La combinaison des bandes 2, 3 et 4 donne une composition en **vraies couleurs** (ce que l'œil verrait depuis l'espace). L'ajout de la bande 5 (PIR) produit une **fausse couleur** où la végétation saine apparaît en rouge vif — très utilisée pour cartographier les couverts végétaux et mesurer des indices comme le NDVI.
+
+### Résolution : le compromis fondamental
+
+La résolution spatiale définit la **plus petite unité observable** dans une image. Un pixel de 1 m permet de distinguer un bâtiment ; un pixel de 250 m ne révèle qu'un bloc urbain. Plus la résolution est fine, plus les fichiers sont volumineux et le calcul coûteux.
+
+La **résolution temporelle** — fréquence de revisite du capteur — est tout aussi importante pour les analyses dynamiques : suivi d'une inondation, cycles de croissance des cultures, progression de la déforestation. Les deux dimensions sont souvent en tension : les capteurs à très haute résolution spatiale revisitent rarement, et vice versa.
+
+### Où trouver des données raster libres
+
+-   [USGS Earth Explorer](https://earthexplorer.usgs.gov/) — Landsat, MODIS et autres archives NASA
+-   [NASA Earthdata Search](https://search.earthdata.nasa.gov/) — catalogue complet d'observation de la Terre
+-   [Copernicus Open Access Hub](https://scihub.copernicus.eu/) — imagerie Sentinel-1, 2, 3, 5P (ESA)
+-   [AppEEARS (LP DAAC)](https://lpdaacsvc.cr.usgs.gov/appeears/) — extraction facilitée des produits terrestres NASA
+-   [OpenTopography](https://opentopography.org/) — MNT haute résolution (LiDAR, SRTM, ALOS)
+
+Pour les sources spécifiques aux modèles d'altitude (NASA Earthdata, RGE ALTI® IGN, NextGIS, `elevatr`), voir [Indices Topographiques → Obtenir des données d'altitude](indices_topo.qmd#sec-dem-sources).
 
 ------------------------------------------------------------------------
 

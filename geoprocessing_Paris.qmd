@@ -140,12 +140,12 @@ Le fichier `listings.csv` contient les annonces Airbnb parisiennes avec leurs co
 | 9     | Cartographier                        | `ggplot() + geom_sf()`       |
 :::
 
-### Exercice 7 — Étapes 1 à 5 : Charger et spatialiser `listings.csv`
+### Exercice 2 — Étapes 1 à 5 : Charger et spatialiser `listings.csv`
 
 Avant d'écrire une seule ligne de code spatial, on explore toujours le CSV brut pour repérer les colonnes de coordonnées.
 
 ```{r}
-#| label: ex7-question
+#| label: ex2-question
 #| eval: false
 
 # Étape 1 : lire le fichier
@@ -189,7 +189,7 @@ airbnb_sf <- st_as_sf(airbnb, coords = c(8, 7)) |>
 :::
 
 ```{r}
-#| label: ex7-answer
+#| label: ex2-answer
 #| code-fold: true
 #| code-summary: "Voir la réponse"
 #| fig-cap: "Points Airbnb superposés aux arrondissements"
@@ -224,7 +224,7 @@ ggplot() +
   )
 ```
 
-### Exercice 8 — Étapes 6 à 8 : Filtrer, joindre et agréger
+### Exercice 3 — Étapes 6 à 8 : Filtrer, joindre et agréger
 
 On exclut les annonces très chères, puis on associe chaque annonce à son arrondissement via une jointure spatiale, avant d'agréger.
 
@@ -235,7 +235,7 @@ On exclut les annonces très chères, puis on associe chaque annonce à son arro
 :::
 
 ```{r}
-#| label: ex8-question
+#| label: airbnb-ex3-question
 #| eval: false
 
 # Étape 6 : filtrer — garder les annonces < 200 €/nuit
@@ -268,7 +268,7 @@ head(airbnb_agg)
 ```
 
 ```{r}
-#| label: ex8-answer
+#| label: airbnb-ex3-answer
 #| code-fold: true
 #| code-summary: "Voir la réponse"
 
@@ -311,7 +311,7 @@ airbnb_agg |>
                caption = "Arrondissements classés par prix Airbnb moyen")
 ```
 
-### Exercice 9 — Étape 9 : Carte finale avec IRIS en filigrane
+### Exercice 4 — Étape 9 : Carte finale avec IRIS en filigrane
 
 On superpose trois couches : le Grand Paris en fond, les arrondissements avec leurs prix, et les IRIS en filigrane pour montrer la structure interne de Paris.
 
@@ -322,7 +322,7 @@ Sans `limits`, `ggplot2` calcule une échelle de couleur séparée pour chaque `
 :::
 
 ```{r}
-#| label: ex9-question
+#| label: airbnb-ex4-question
 #| eval: false
 
 iris <- read_sf("data/Paris/Polygons/iris.shp") |>
@@ -354,7 +354,7 @@ ggplot() +
 ```
 
 ```{r}
-#| label: ex9-answer
+#| label: airbnb-ex4-answer
 #| code-fold: true
 #| code-summary: "Voir la réponse"
 #| fig-cap: "Prix moyen Airbnb par arrondissement avec IRIS en fond"
@@ -397,7 +397,7 @@ ggplot() +
 
 ------------------------------------------------------------------------
 
-### Exercice 2 — Charger les données socio-économiques
+### Exercice 5 — Charger les données socio-économiques
 
 Chargez le fichier `donnees_arrondissement_enrichi.csv` et examinez sa structure. Ce fichier contient les variables suivantes :
 
@@ -415,7 +415,7 @@ Chargez le fichier `donnees_arrondissement_enrichi.csv` et examinez sa structure
 | `n_musees`          | Nombre de musées                                 |
 
 ```{r}
-#| label: ex2-question
+#| label: ex5-question
 #| eval: false
 
 donnees <- read.csv("data/Paris/Tables/donnees_arrondissement_enrichi.csv")
@@ -423,7 +423,7 @@ head(___)
 ```
 
 ```{r}
-#| label: ex2-answer
+#| label: ex5-answer
 #| code-fold: true
 #| code-summary: "Voir la réponse"
 
@@ -436,7 +436,7 @@ donnees <- read.csv("data/Paris/Tables/donnees_arrondissement_enrichi.csv") |>
 head(donnees)
 ```
 
-### Exercice 3 — Jointure attributaire
+### Exercice 6 — Jointure attributaire
 
 Joignez les données socio-économiques aux polygones des arrondissements. La clé de jointure est `c_arinsee` dans les deux tables.
 
@@ -447,7 +447,7 @@ Joignez les données socio-économiques aux polygones des arrondissements. La cl
 :::
 
 ```{r}
-#| label: ex3-question
+#| label: ex6-question
 #| eval: false
 
 PA_data <- left_join(___, ___,
@@ -460,7 +460,7 @@ PA_data |> st_drop_geometry() |>
 ```
 
 ```{r}
-#| label: ex3-answer
+#| label: ex6-answer
 #| code-fold: true
 #| code-summary: "Voir la réponse"
 
@@ -477,12 +477,12 @@ PA_data |> st_drop_geometry() |>
 
 ## Cartographier les arrondissements {#sec-maps}
 
-### Exercice 4 — Carte de base
+### Exercice 7 — Carte de base
 
 Créez une carte de base des arrondissements avec leurs noms.
 
 ```{r}
-#| label: ex4-question
+#| label: ex7-question
 #| eval: false
 
 map_paris <- ggplot() +
@@ -495,7 +495,7 @@ map_paris
 ```
 
 ```{r}
-#| label: ex4-answer
+#| label: ex7-answer
 #| code-fold: true
 #| code-summary: "Voir la réponse"
 #| fig-cap: "Arrondissements de Paris avec numérotation"
@@ -512,7 +512,7 @@ map_paris <- ggplot() +
 map_paris
 ```
 
-### Exercice 5 — Carte choroplèthe : prix au m²
+### Exercice 8 — Carte choroplèthe : prix au m²
 
 Cartographiez le prix moyen au m² par arrondissement avec une palette séquentielle.
 
@@ -523,7 +523,7 @@ La variable s'appelle `prix_m2_appart`. Choisissez une palette qui va du clair (
 :::
 
 ```{r}
-#| label: ex5-question
+#| label: ex8-question
 #| eval: false
 
 ggplot(PA_data) +
@@ -538,7 +538,7 @@ ggplot(PA_data) +
 ```
 
 ```{r}
-#| label: ex5-answer
+#| label: ex8-answer
 #| code-fold: true
 #| code-summary: "Voir la réponse"
 #| fig-cap: "Prix moyen au m² par arrondissement parisien"
@@ -564,12 +564,12 @@ ggplot(PA_data) +
   )
 ```
 
-### Exercice 6 — Carte avec Jenks et fond Grand Paris
+### Exercice 9 — Carte avec Jenks et fond Grand Paris
 
 Reprenez la variable `taux_chomage`, utilisez une classification de Jenks, et ajoutez le Grand Paris en fond de carte.
 
 ```{r}
-#| label: ex6-question
+#| label: ex9-question
 #| eval: false
 
 chomage_vec <- PA_data |> st_drop_geometry() |> pull(taux_chomage)
@@ -591,7 +591,7 @@ ggplot() +
 ```
 
 ```{r}
-#| label: ex6-answer
+#| label: ex9-answer
 #| code-fold: true
 #| code-summary: "Voir la réponse"
 #| fig-cap: "Taux de chômage par arrondissement (Jenks, n=5) sur fond Grand Paris"
@@ -715,35 +715,146 @@ ggplot(grille_airbnb) +
 
 ## Exporter vos cartes {#sec-export}
 
-Une fois satisfait du résultat, exportez avec `ggsave()` :
+`ggsave()` sauvegarde le dernier graphique affiché — ou celui que vous passez explicitement dans l'argument `plot =`. C'est la fonction standard pour exporter vers PNG, PDF, SVG et d'autres formats.
+
+### Utilisation de base
 
 ```{r}
-#| label: export
+#| label: export-basic
 #| eval: false
 
 dir.create("maps", showWarnings = FALSE)
 
-# PNG haute résolution pour présentation
+# PNG haute résolution — pour présentations et rapports
 ggsave("maps/paris_prix_airbnb.png",
        width = 20, height = 20, units = "cm", dpi = 300)
 
-# PDF vectoriel pour publication
+# PDF vectoriel — pour publications (redimensionnable sans perte)
 ggsave("maps/paris_prix_airbnb.pdf",
+       width = 20, height = 20, units = "cm")
+
+# SVG — pour le web ou l'édition dans Inkscape / Illustrator
+ggsave("maps/paris_prix_airbnb.svg",
        width = 20, height = 20, units = "cm")
 ```
 
-::: callout-tip
-## Paramètres `ggsave()` utiles
+### Contrôler les dimensions et la résolution
 
-| Paramètre         | Usage                                                |
-|-------------------|------------------------------------------------------|
-| `width`, `height` | Dimensions (défaut : pouces, ou préciser `units`)    |
-| `dpi`             | Résolution — 300 pour impression, 150 pour web       |
-| `device`          | `"png"`, `"pdf"`, `"svg"`                            |
-| `plot`            | Objet ggplot à sauvegarder (dernier plot par défaut) |
+Les dimensions contrôlent la taille du canevas. La résolution (`dpi`) contrôle la densité de pixels — elle n'affecte pas la taille physique, mais la netteté à l'impression ou sur écran.
+
+```{r}
+#| label: export-dimensions
+#| eval: false
+
+# Format A4 paysage (297 × 210 mm)
+ggsave("maps/carte_a4.png",
+       width = 29.7, height = 21.0, units = "cm", dpi = 300)
+
+# Format carré pour réseaux sociaux (1080 × 1080 px)
+# À 96 dpi, 1080px ÷ 96 = 11.25 pouces
+ggsave("maps/carte_social.png",
+       width = 11.25, height = 11.25, units = "in", dpi = 96)
+
+# Vignette basse résolution pour aperçu rapide
+ggsave("maps/carte_apercu.png",
+       width = 10, height = 10, units = "cm", dpi = 72)
+```
+
+::: callout-tip
+## Choisir le bon `dpi`
+
+| Destination                       | `dpi` recommandé |
+|-----------------------------------|------------------|
+| Impression (journal, rapport)     | 300              |
+| Présentation PowerPoint / Keynote | 150–200          |
+| Web, email, aperçu                | 72–96            |
+| Publication scientifique          | 300–600          |
+
+Au-delà de 300 dpi, le gain est invisible à l'œil nu sauf pour les très grands formats imprimés.
+:::
+
+### Contrôler la taille du texte et des éléments
+
+Un problème fréquent : la carte est lisible dans RStudio mais le texte est minuscule une fois exportée, ou inversement trop gros. La cause est presque toujours un décalage entre les dimensions du canevas et le `base_size` du thème.
+
+**Règle pratique :** `base_size` ≈ largeur en cm ÷ 2.
+
+```{r}
+#| label: export-text
+#| eval: false
+
+# Pour un export 20 × 20 cm → base_size = 10 est un bon point de départ
+ma_carte <- ggplot(PA_data) +
+  geom_sf(aes(fill = prix_m2_appart), color = "white", linewidth = 0.3) +
+  scale_fill_viridis_c(option = "plasma", direction = -1,
+                        name = "Prix au m²\n(€)") +
+  labs(title    = "Prix au m² — Paris",
+       subtitle = "Arrondissements",
+       caption  = "Source : données Paris | Cours R-Carto") +
+  theme_void(base_size = 10) +           # base_size contrôle toutes les tailles relatives
+  theme(
+    plot.title    = element_text(face = "bold", size = 14, hjust = 0.5),
+    plot.subtitle = element_text(size = 10, color = "grey40", hjust = 0.5),
+    plot.caption  = element_text(size = 7,  color = "grey55", hjust = 0),
+    legend.title  = element_text(size = 9,  face = "bold"),
+    legend.text   = element_text(size = 8),
+    plot.margin   = margin(10, 15, 10, 15)   # marges : haut, droite, bas, gauche (pt)
+  )
+
+ggsave("maps/carte_texte_controle.png",
+       plot   = ma_carte,       # passer l'objet explicitement
+       width  = 20, height = 20, units = "cm", dpi = 300)
+```
+
+::: callout-warning
+## Le piège du `base_size`
+
+`theme_void(base_size = 13)` dans RStudio produit un texte lisible dans le panneau Plots (environ 7 × 5 cm). Si vous exportez cette même carte en 20 × 20 cm avec `dpi = 300`, le texte paraîtra **énorme** car les proportions changent.
+
+Workflow recommandé :
+
+1.  Construire la carte avec `base_size` adapté aux dimensions d'export cibles
+2.  Sauvegarder dans `plot = ma_carte`
+3.  Exporter et vérifier le résultat dans un visionneur externe (pas le panneau RStudio)
+:::
+
+### Sauvegarder plusieurs cartes en une boucle
+
+```{r}
+#| label: export-loop
+#| eval: false
+
+# Exporter la même carte dans plusieurs formats d'un coup
+formats <- c("png", "pdf", "svg")
+
+for (fmt in formats) {
+  ggsave(
+    filename = paste0("maps/paris_prix_airbnb.", fmt),
+    plot     = ma_carte,
+    width    = 20, height = 20, units = "cm",
+    dpi      = if (fmt == "png") 300 else NA   # dpi ignoré pour pdf/svg
+  )
+}
+```
+
+::: callout-tip
+## Récapitulatif des paramètres `ggsave()`
+
+| Paramètre | Valeurs typiques | Notes |
+|----|----|----|
+| `filename` | `"maps/carte.png"` | Extension détermine le format si `device` absent |
+| `plot` | `ma_carte` | Dernier plot si omis |
+| `width`, `height` | `20`, `29.7`… | Toujours préciser `units` |
+| `units` | `"cm"`, `"in"`, `"mm"`, `"px"` | `"cm"` recommandé |
+| `dpi` | `72`, `150`, `300` | Ignoré pour pdf et svg |
+| `device` | `"png"`, `"pdf"`, `"svg"`, `"tiff"` | Utile pour forcer le format |
+| `bg` | `"white"`, `"transparent"` | Couleur de fond (utile si `plot.background = NA`) |
+| `scale` | `1`, `1.5`, `0.8` | Multiplie toutes les tailles — dernier recours |
 
 Documentation complète : [ggplot2.tidyverse.org/reference/ggsave](https://ggplot2.tidyverse.org/reference/ggsave.html)
 :::
+
+------------------------------------------------------------------------
 
 ------------------------------------------------------------------------
 
