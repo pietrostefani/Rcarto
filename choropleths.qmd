@@ -561,46 +561,15 @@ Les choix cartographiques sont des **choix éditoriaux** — ils ne sont jamais 
 
 ------------------------------------------------------------------------
 
-## Exercice pratique {#sec-exercise}
+::: callout-tip
+## Exercice : appliquer sur des données réelles
 
-::: callout-note
-## À vous de jouer !
-
-Avec les données `france_regions` chargées dans ce document :
-
-1.  Cartographiez `part_diplomes` avec **3 méthodes de classification** en `ggplot2`
-2.  Pour chaque carte, justifiez en une phrase pourquoi cette méthode est adaptée (ou non)
-3.  Choisissez la palette la plus appropriée et justifiez votre choix
-4.  Produisez une carte finale complète avec titre, sous-titre, légende et source
-
-**Bonus :** Superposez `densite_pop` en symboles proportionnels sur votre carte finale.
+Mettez en pratique ces méthodes de classification sur les **départements de France métropolitaine** (densité de population, données INSEE 2022) : **[Exercice : cartes choroplèthes sur la France](choropleths_France.qmd)**.
 :::
-
-```{r}
-#| label: exercice
-#| eval: false
-
-# Votre code ici — remplacez les ... par vos paramètres
-diplomes_vec <- france_regions |> st_drop_geometry() |> pull(part_diplomes)
-breaks_ex    <- classIntervals(diplomes_vec, n = 5, style = "...")
-
-france_regions <- france_regions |>
-  mutate(classe_ex = cut(part_diplomes,
-                          breaks = breaks_ex$brks,
-                          include.lowest = TRUE,
-                          dig.lab = 4,
-                          ordered_result = TRUE) |> clean_cut_labels())
-
-ggplot(france_regions) +
-  geom_sf(aes(fill = classe_ex), color = "white", linewidth = 0.4) +
-  scale_fill_brewer(palette = "...", name = "...") +
-  labs(title = "...", subtitle = "...", caption = "...") +
-  theme_void()
-```
 
 ------------------------------------------------------------------------
 
-> **← Section précédente : [Introduction à la Cartographie](01_introduction.qmd)** **→ Section suivante : Manipulation d'Objets Vectoriels** *(à venir)*
+> **← Section précédente : [Introduction à la Cartographie](introduction.qmd)** **→ Section suivante : Manipulation d'Objets Vectoriels** *(à venir)*
 
 ------------------------------------------------------------------------
 

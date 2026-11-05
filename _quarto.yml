@@ -25,6 +25,7 @@ book:
 
     - part: "Réponses"
       chapters:
+        - choropleths_France.qmd
         - geoprocessing_Paris.qmd
         - indices_topo_Corse.qmd
         - interpolation_Paris.qmd

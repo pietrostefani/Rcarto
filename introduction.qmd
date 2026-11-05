@@ -22,9 +22,9 @@ execute:
 
 Ce cours est structuré en deux jours et trois modalités complémentaires :
 
--   **Présentations** — notions de cartographie et de SIG, contexte théorique
--   **Hands-on** — démonstrations guidées en R/Quarto sur des données réelles
--   **Do it yourself** — exercices à reproduire de façon autonome (avec corrigés)
+- **Présentations** — notions de cartographie et de SIG, contexte théorique
+- **Hands-on** — démonstrations guidées en R/Quarto sur des données réelles
+- **Do it yourself** — exercices à reproduire de façon autonome (avec corrigés)
 
 Le fil conducteur est géographique : Londres pour les démonstrations, Paris et la Corse pour les exercices. Les données utilisées tout au long du cours sont des données ouvertes réelles — transactions immobilières, annonces Airbnb, MNT SRTM, données GPW de population.
 
@@ -32,10 +32,10 @@ Le fil conducteur est géographique : Londres pour les démonstrations, Paris et
 
 Ce cours propose **un aperçu général** des nombreuses méthodes et techniques disponibles pour exploiter les données spatiales. L'accent est mis sur :
 
--   L'**intuition** plutôt que l'exhaustivité technique
--   L'**application** et l'utilisation concrète
--   Les **connexions avec le monde réel**
--   L'autonomisation pour **continuer par vous-mêmes**
+- L'**intuition** plutôt que l'exhaustivité technique
+- L'**application** et l'utilisation concrète
+- Les **connexions avec le monde réel**
+- L'autonomisation pour **continuer par vous-mêmes**
 
 ::: callout-tip
 ## Une citation à garder en tête
@@ -53,9 +53,9 @@ L'information géographique joue un rôle crucial dans nos sociétés modernes. 
 
 Travailler avec des SIG permet de :
 
--   **Analyser et extraire** des informations à partir de données géospatiales
--   **Travailler sur des données du monde réel** dans de nombreux domaines
--   **Acquérir des compétences clés** en science des données spatiales — très demandées dans l'industrie
+- **Analyser et extraire** des informations à partir de données géospatiales
+- **Travailler sur des données du monde réel** dans de nombreux domaines
+- **Acquérir des compétences clés** en science des données spatiales — très demandées dans l'industrie
 
 ### Un premier exemple : visualiser les élections françaises
 
@@ -71,21 +71,21 @@ Ce type de carte — une **choroplèthe** — colorie chaque unité géographiqu
 
 **Sélectionner des données selon des critères spatiaux**
 
--   Quelles stations de surveillance de la pollution se trouvent à moins de 1 km de la station Holborn ?
--   Combien de logements sociaux se trouvent sur un territoire donné ?
+- Quelles stations de surveillance de la pollution se trouvent à moins de 1 km de la station Holborn ?
+- Combien de logements sociaux se trouvent sur un territoire donné ?
 
 **Transformer et réagréger des données**
 
--   Associer les données sur les logements et leurs prix aux données sur les écoles et leurs résultats scolaires
--   Prédiction et interpolation basées sur des modèles spatiaux
+- Associer les données sur les logements et leurs prix aux données sur les écoles et leurs résultats scolaires
+- Prédiction et interpolation basées sur des modèles spatiaux
 
 **Répondre à des questions causales**
 
--   Les prix des logements ont-ils augmenté suite à une politique spatiale ?
+- Les prix des logements ont-ils augmenté suite à une politique spatiale ?
 
 **Sélectionner un site**
 
--   Quel est le meilleur emplacement pour un parc éolien selon des critères spécifiques ?
+- Quel est le meilleur emplacement pour un parc éolien selon des critères spécifiques ?
 
 ::: {.callout-note collapse="true"}
 ## Exemple : Pollution et pauvreté à Londres
@@ -108,7 +108,7 @@ Le SIG permet ici de rassembler différents types de données dans un système �
 Il existe une distinction importante entre les approches :
 
 | Approche | Description |
-|--------------------------------|----------------------------------------|
+|----|----|
 | **SIG classique** | Production de cartes et produits analytiques via un logiciel de bureau (ex. QGIS, ArcGIS) |
 | **Geographic Data Science** | Écriture de code et pipelines produisant des représentations cartographiques et analytiques reproductibles |
 
@@ -126,10 +126,10 @@ Un SIG intègre des couches d'information hétérogènes géoréférencées. Le 
 
 Les couches typiques incluent :
 
--   Données définissant des caractéristiques géographiques (routes, rivières)
--   Types de sol, utilisation du sol, altitude
--   Démographie, attributs socio-économiques
--   Environnement, climat, qualité de l'air
+- Données définissant des caractéristiques géographiques (routes, rivières)
+- Types de sol, utilisation du sol, altitude
+- Démographie, attributs socio-économiques
+- Environnement, climat, qualité de l'air
 
 ### Types de données : Vecteur
 
@@ -151,9 +151,9 @@ Les données raster représentent l'espace sous forme d'une **grille régulière
 
 **Caractéristiques :**
 
--   Équivalent aux formats d'images numériques (JPEG, TIFF…)
--   Adapté aux surfaces continues : altitude, pollution, occupation du sol
--   La conversion vecteur → raster est simple ; l'inverse est complexe
+- Équivalent aux formats d'images numériques (JPEG, TIFF…)
+- Adapté aux surfaces continues : altitude, pollution, occupation du sol
+- La conversion vecteur → raster est simple ; l'inverse est complexe
 
 ::: callout-tip
 ## Vecteur ou Raster ?
@@ -166,7 +166,7 @@ Utilisez le **raster** pour des phénomènes continus dans l'espace (températur
 ### Types de fichiers
 
 | Format | Extension | Description |
-|------------------|-------------------------|-----------------------------|
+|----|----|----|
 | **Geopackage** | `.gpkg` | Open Source · OGC standard · Un seul fichier · Plusieurs couches · **Recommandé** |
 | **Shapefile** | `.shp` | Standard ESRI · Multi-fichiers · Limité à 2 Go |
 | **GeoJSON** | `.geojson` | Format texte · Basé sur JSON · Idéal pour le web et les APIs |
@@ -176,10 +176,10 @@ Utilisez le **raster** pour des phénomènes continus dans l'espace (températur
 ::: callout-warning
 ## Shapefiles : limitations à connaître
 
--   Format multi-fichiers (`.shp`, `.dbf`, `.shx`, `.prj`…) — ne jamais envoyer uniquement le `.shp` !
--   Noms d'attributs limités à **10 caractères**
--   Taille de fichier limitée à **2 Go**
--   Un seul type de géométrie par fichier
+- Format multi-fichiers (`.shp`, `.dbf`, `.shx`, `.prj`…) — ne jamais envoyer uniquement le `.shp` !
+- Noms d'attributs limités à **10 caractères**
+- Taille de fichier limitée à **2 Go**
+- Un seul type de géométrie par fichier
 
 **Préférez le GeoPackage** (`.gpkg`) pour les nouveaux projets.
 :::
@@ -194,12 +194,12 @@ Plusieurs outils permettent de travailler avec des données spatiales. Ce cours 
 
 R se distingue par :
 
--   **Communauté incroyable** (#rstats)
--   **Gestion des données** accessible et puissante (`tidyverse`)
--   **Répertoire exceptionnel** de méthodes statistiques et spatiales (`sf`, `terra`, `gstat`, `exactextractr`…)
--   **Interopérabilité** avec d'autres langages (Python intégrable via `reticulate`)
--   **Visualisation** de haute qualité avec `ggplot2` — le même outil pour les cartes et les graphiques
--   **Reproductibilité** totale via les scripts et Quarto
+- **Communauté incroyable** (#rstats)
+- **Gestion des données** accessible et puissante (`tidyverse`)
+- **Répertoire exceptionnel** de méthodes statistiques et spatiales (`sf`, `terra`, `gstat`, `exactextractr`…)
+- **Interopérabilité** avec d'autres langages (Python intégrable via `reticulate`)
+- **Visualisation** de haute qualité avec `ggplot2` — le même outil pour les cartes et les graphiques
+- **Reproductibilité** totale via les scripts et Quarto
 
 ### L'environnement RStudio
 
@@ -216,10 +216,10 @@ RStudio est un IDE (*Integrated Development Environment*) qui organise le travai
 
 Quarto (successeur de R Markdown) permet de mélanger code, texte et graphiques pour produire :
 
--   Des rapports automatisés et reproductibles
--   Des présentations
--   Des **sites web** (comme ce cours !)
--   Des tableaux de bord interactifs
+- Des rapports automatisés et reproductibles
+- Des présentations
+- Des **sites web** (comme ce cours !)
+- Des tableaux de bord interactifs
 
 ------------------------------------------------------------------------
 
@@ -344,7 +344,7 @@ mon_df |>
 Vous verrez les deux dans des codes R existants. Ils font essentiellement la même chose :
 
 | Opérateur | Origine | Usage |
-|-----------------------------|------------------------|-------------------|
+|----|----|----|
 | `|>` | R natif (depuis R 4.1) | **Recommandé** — aucun package requis |
 | `%>%` | Package `magrittr` / `dplyr` | Très répandu dans les anciens scripts |
 
@@ -371,7 +371,7 @@ ggplot(data = mon_sf) +                    # 1. données de base
 **Les éléments clés :**
 
 | Élément | Rôle | Exemple |
-|---------------------------|------------------|---------------------------|
+|----|----|----|
 | `ggplot()` | Initialiser le graphique | `ggplot(data = france)` |
 | `geom_*()` | Choisir la forme visuelle | `geom_sf()`, `geom_histogram()`, `geom_point()` |
 | `aes()` | Lier une variable à une esthétique | `aes(fill = chomage)` |
@@ -406,7 +406,7 @@ ggplot(mon_sf) + geom_sf(aes(fill = prix))
 Lorsque vous classifiez une variable continue avec `cut()` — pour créer des classes sur une carte choroplèthe — R affiche les bornes avec des crochets qui viennent des **notations mathématiques des intervalles** :
 
 | Symbole | Signification              | Exemple                                 |
-|---------------------|-------------------------------|---------------------|
+|---------|----------------------------|-----------------------------------------|
 | `(`     | borne **exclue** (ouverte) | `(10, 20]` : strictement supérieur à 10 |
 | `[`     | borne **incluse** (fermée) | `[10, 20)` : supérieur ou égal à 10     |
 | `]`     | borne **incluse**          | `(10, 20]` : inférieur ou égal à 20     |
@@ -445,7 +445,7 @@ Ce cours est organisé en deux grandes sections, chacune accompagnée de ses cor
 **Section 1 — Les fondamentaux**
 
 | Chapitre | Contenu |
-|--------------------------------------|----------------------------------|
+|----|----|
 | [Objets spatiaux](simplefeatures.qmd) | Types géométriques, objets `sf`, premières cartes |
 | [Choroplèthes](choropleths.qmd) | Classification, palettes, méthodes de discrétisation |
 | [Systèmes de coordonnées](crs.qmd) | SCR, projections, reprojection |
@@ -454,7 +454,7 @@ Ce cours est organisé en deux grandes sections, chacune accompagnée de ses cor
 **Section 2 — Géotraitement et analyse spatiale**
 
 | Chapitre | Contenu | Corrigé |
-|--------------------------|-----------------------|-----------------------|
+|----|----|----|
 | [Géotraitement — Londres](geoprocessing_Londres.qmd) | Jointures spatiales, zones tampons, distance | [Paris](geoprocessing_Paris.qmd) |
 | [Indices topographiques](indices_topo.qmd) | Pente, reclassification, extraction — Liban | [Corse](indices_topo_Corse.qmd) |
 | [Interpolation spatiale](interpolation.qmd) | IDW, heatmaps — Londres | [Paris Airbnb](interpolation_Paris.qmd) |

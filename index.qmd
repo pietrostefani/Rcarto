@@ -18,11 +18,11 @@ Ce site rassemble les supports de la formation **R pour la Cartographie et les S
 
 La formation vous permettra d'**analyser et visualiser des données géographiques avec R**, en passant des fondamentaux — objets spatiaux, choroplèthes, projections, raster — jusqu'au géotraitement avancé et à l'interpolation spatiale. Tout le cours est construit autour de `ggplot2` comme outil de visualisation unique, et de données réelles : transactions immobilières à Londres, annonces Airbnb à Paris, MNT du Liban et de la Corse.
 
----
+------------------------------------------------------------------------
 
 ### Programme {.unnumbered}
 
-::::::: grid
+::::: grid
 ::: g-col-6
 ### Les fondamentaux
 
@@ -68,9 +68,9 @@ IDW (Pondération Inverse à la Distance) et heatmaps — prix immobiliers à Lo
 
 *Exercice → [Paris Airbnb](interpolation_Paris.qmd)*
 :::
-:::::::
+:::::
 
----
+------------------------------------------------------------------------
 
 ## Prérequis {.unnumbered}
 
@@ -78,7 +78,7 @@ IDW (Pondération Inverse à la Distance) et heatmaps — prix immobiliers à Lo
 - Notions de base de R (data frames, fonctions)
 - Packages à installer avant la formation :
 
-```r
+``` r
 install.packages(c(
   # Données vectorielles
   "sf",
@@ -121,7 +121,7 @@ install.packages(c(
 ))
 ```
 
----
+------------------------------------------------------------------------
 
 ## Formatrice {.unnumbered}
 

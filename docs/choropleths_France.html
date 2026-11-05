@@ -1,0 +1,1672 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.36">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Dr.&nbsp;Elisabetta Pietrostefani">
+<meta name="dcterms.date" content="2026-11-05">
+
+<title>Choroplèthes France – RCarto</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="site_libs/quarto-nav/headroom.min.js"></script>
+<script src="site_libs/clipboard/clipboard.min.js"></script>
+<script src="site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="site_libs/quarto-search/fuse.min.js"></script>
+<script src="site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="./">
+<link href="./geoprocessing_Paris.html" rel="next">
+<link href="./interpolation.html" rel="prev">
+<script src="site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="site_libs/quarto-html/popper.min.js"></script>
+<script src="site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="site_libs/quarto-html/anchor.min.js"></script>
+<link href="site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="site_libs/quarto-html/quarto-syntax-highlighting-845c23b38eaddc0f92fda52bfe77a8c8.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="site_libs/bootstrap/bootstrap-d61101752a43e6db2baa24b252b88ce6.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "sidebar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "start",
+  "type": "textbox",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+
+
+<meta name="twitter:title" content="Choroplèthes France – RCarto">
+<meta name="twitter:description" content="">
+<meta name="twitter:image" content="https://pietrostefani.github.io/rcarto/choropleths_France_files/figure-html/unnamed-chunk-8-1.png">
+<meta name="twitter:creator" content="@EPietrostefani">
+<meta name="twitter:image-height" content="1152">
+<meta name="twitter:image-width" content="1536">
+<meta name="twitter:card" content="summary_large_image">
+</head>
+
+<body class="nav-sidebar floating quarto-light">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+  <nav class="quarto-secondary-nav">
+    <div class="container-fluid d-flex">
+      <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" role="button" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+        <i class="bi bi-layout-text-sidebar-reverse"></i>
+      </button>
+        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="./choropleths_France.html">Réponses</a></li><li class="breadcrumb-item"><a href="./choropleths_France.html">Choroplèthes France</a></li></ol></nav>
+        <a class="flex-grow-1" role="navigation" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
+        </a>
+      <button type="button" class="btn quarto-search-button" aria-label="Search" onclick="window.quartoOpenSearch();">
+        <i class="bi bi-search"></i>
+      </button>
+    </div>
+  </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article">
+<!-- sidebar -->
+  <nav id="quarto-sidebar" class="sidebar collapse collapse-horizontal quarto-sidebar-collapse-item sidebar-navigation floating overflow-auto">
+    <div class="pt-lg-2 mt-2 text-left sidebar-header">
+    <div class="sidebar-title mb-0 py-0">
+      <a href="./">RCarto</a> 
+        <div class="sidebar-tools-main">
+    <a href="https://github.com/pietrostefani/rcarto" title="Source Code" class="quarto-navigation-tool px-1" aria-label="Source Code"><i class="bi bi-github"></i></a>
+    <div class="dropdown">
+      <a href="" title="Share" id="quarto-navigation-tool-dropdown-0" class="quarto-navigation-tool dropdown-toggle px-1" data-bs-toggle="dropdown" aria-expanded="false" role="link" aria-label="Share"><i class="bi bi-share"></i></a>
+      <ul class="dropdown-menu" aria-labelledby="quarto-navigation-tool-dropdown-0">
+          <li>
+            <a class="dropdown-item sidebar-tools-main-item" href="https://twitter.com/intent/tweet?url=|url|">
+              <i class="bi bi-twitter pe-1"></i>
+            Twitter
+            </a>
+          </li>
+          <li>
+            <a class="dropdown-item sidebar-tools-main-item" href="https://www.facebook.com/sharer/sharer.php?u=|url|">
+              <i class="bi bi-facebook pe-1"></i>
+            Facebook
+            </a>
+          </li>
+      </ul>
+    </div>
+</div>
+    </div>
+      </div>
+        <div class="mt-2 flex-shrink-0 align-items-center">
+        <div class="sidebar-search">
+        <div id="quarto-search" class="" title="Search"></div>
+        </div>
+        </div>
+    <div class="sidebar-menu-container"> 
+    <ul class="list-unstyled mt-1">
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">1</span>&nbsp; <span class="chapter-title">R pour la Cartographie</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./introduction.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">2</span>&nbsp; <span class="chapter-title">Introduction à la Cartographie</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="true">
+ <span class="menu-text">Section 1 — Basics</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-1" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./simplefeatures.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">3</span>&nbsp; <span class="chapter-title">Données Spatiales et Simple Features</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./choropleths.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">4</span>&nbsp; <span class="chapter-title">Choroplèthes</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./crs.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">5</span>&nbsp; <span class="chapter-title">Systèmes de Coordonnées de Référence</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./raster.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">6</span>&nbsp; <span class="chapter-title">Données Raster</span></span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" role="navigation" aria-expanded="true">
+ <span class="menu-text">Section 2 — Géotraitement et Analyse Spatiale</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-2" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./geoprocessing_Londres.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">7</span>&nbsp; <span class="chapter-title">Géotraitement</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./indices_topo.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">8</span>&nbsp; <span class="chapter-title">Raster : Indices Topographiques</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./interpolation.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">9</span>&nbsp; <span class="chapter-title">Lissage et Interpolation Spatiale</span></span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-3" role="navigation" aria-expanded="true">
+ <span class="menu-text">Réponses</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-3" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-3" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./choropleths_France.html" class="sidebar-item-text sidebar-link active">
+ <span class="menu-text">Choroplèthes France</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./geoprocessing_Paris.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">10</span>&nbsp; <span class="chapter-title">Géotraitement : Paris</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./indices_topo_Corse.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">11</span>&nbsp; <span class="chapter-title">Raster : Corse</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./interpolation_Paris.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">12</span>&nbsp; <span class="chapter-title">Interpolation Paris : Corrigé</span></span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+    </ul>
+    </div>
+</nav>
+<div id="quarto-sidebar-glass" class="quarto-sidebar-collapse-item" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item"></div>
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar"><div class="quarto-margin-header"><div class="margin-header-item">
+<p><img src="./logos_web.png" class="img-fluid"></p>
+</div></div>
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">Table of contents</h2>
+   
+  <ul>
+  <li><a href="#installation-des-packages" id="toc-installation-des-packages" class="nav-link active" data-scroll-target="#installation-des-packages">Installation des packages</a></li>
+  <li><a href="#données" id="toc-données" class="nav-link" data-scroll-target="#données">Données</a>
+  <ul class="collapse">
+  <li><a href="#les-contours-des-départements" id="toc-les-contours-des-départements" class="nav-link" data-scroll-target="#les-contours-des-départements">Les contours des départements</a></li>
+  <li><a href="#la-population-insee" id="toc-la-population-insee" class="nav-link" data-scroll-target="#la-population-insee">La population (INSEE)</a></li>
+  <li><a href="#jointure-et-calcul-de-la-densité" id="toc-jointure-et-calcul-de-la-densité" class="nav-link" data-scroll-target="#jointure-et-calcul-de-la-densité">Jointure et calcul de la densité</a></li>
+  </ul></li>
+  <li><a href="#valeurs-uniques" id="toc-valeurs-uniques" class="nav-link" data-scroll-target="#valeurs-uniques">Valeurs uniques</a></li>
+  <li><a href="#intervalles-égaux" id="toc-intervalles-égaux" class="nav-link" data-scroll-target="#intervalles-égaux">Intervalles égaux</a></li>
+  <li><a href="#quantiles" id="toc-quantiles" class="nav-link" data-scroll-target="#quantiles">Quantiles</a></li>
+  <li><a href="#fisher-jenks" id="toc-fisher-jenks" class="nav-link" data-scroll-target="#fisher-jenks">Fisher-Jenks</a></li>
+  <li><a href="#zoomer-sur-la-carte" id="toc-zoomer-sur-la-carte" class="nav-link" data-scroll-target="#zoomer-sur-la-carte">Zoomer sur la carte</a></li>
+  <li><a href="#une-carte-finale-avec-des-bornes-choisies-à-la-main" id="toc-une-carte-finale-avec-des-bornes-choisies-à-la-main" class="nav-link" data-scroll-target="#une-carte-finale-avec-des-bornes-choisies-à-la-main">Une carte finale avec des bornes choisies à la main</a></li>
+  <li><a href="#exercice" id="toc-exercice" class="nav-link" data-scroll-target="#exercice">Exercice</a>
+  <ul class="collapse">
+  <li><a href="#étape-0-choisir-et-construire-votre-variable" id="toc-étape-0-choisir-et-construire-votre-variable" class="nav-link" data-scroll-target="#étape-0-choisir-et-construire-votre-variable">Étape 0 : choisir et construire votre variable</a></li>
+  <li><a href="#étape-1-explorer-la-distribution" id="toc-étape-1-explorer-la-distribution" class="nav-link" data-scroll-target="#étape-1-explorer-la-distribution">Étape 1 : explorer la distribution</a></li>
+  <li><a href="#étape-2-comparer-trois-méthodes-de-classification" id="toc-étape-2-comparer-trois-méthodes-de-classification" class="nav-link" data-scroll-target="#étape-2-comparer-trois-méthodes-de-classification">Étape 2 : comparer trois méthodes de classification</a></li>
+  <li><a href="#étape-3-choisir-la-palette" id="toc-étape-3-choisir-la-palette" class="nav-link" data-scroll-target="#étape-3-choisir-la-palette">Étape 3 : choisir la palette</a></li>
+  <li><a href="#étape-4-la-carte-finale" id="toc-étape-4-la-carte-finale" class="nav-link" data-scroll-target="#étape-4-la-carte-finale">Étape 4 : la carte finale</a></li>
+  <li><a href="#point-de-départ" id="toc-point-de-départ" class="nav-link" data-scroll-target="#point-de-départ">Point de départ</a></li>
+  </ul></li>
+  <li><a href="#pour-aller-plus-loin" id="toc-pour-aller-plus-loin" class="nav-link" data-scroll-target="#pour-aller-plus-loin">Pour aller plus loin</a></li>
+  </ul>
+<div class="toc-actions"><ul><li><a href="https://github.com/pietrostefani/rcarto/edit/main/choropleths_France.qmd" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li></ul></div></nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default"><nav class="quarto-page-breadcrumbs quarto-title-breadcrumbs d-none d-lg-block" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="./choropleths_France.html">Réponses</a></li><li class="breadcrumb-item"><a href="./choropleths_France.html">Choroplèthes France</a></li></ol></nav>
+<div class="quarto-title">
+<h1 class="title">Choroplèthes France</h1>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    <div>
+    <div class="quarto-title-meta-heading">Author</div>
+    <div class="quarto-title-meta-contents">
+             <p>Dr.&nbsp;Elisabetta Pietrostefani </p>
+          </div>
+  </div>
+    
+    <div>
+    <div class="quarto-title-meta-heading">Published</div>
+    <div class="quarto-title-meta-contents">
+      <p class="date">November 5, 2026</p>
+    </div>
+  </div>
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<section id="installation-des-packages" class="level2">
+<h2 class="anchored" data-anchor-id="installation-des-packages">Installation des packages</h2>
+<p>Avant de cartographier, chargeons les packages nécessaires :</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="co"># 'sf' (Simple Features) : manipulation de données spatiales</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(sf)</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="co"># 'tidyverse' : ensemble de packages pour la manipulation et la visualisation de données</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(tidyverse)</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="co"># 'readr' : lecture rapide de fichiers CSV</span></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(readr)</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="co"># 'RColorBrewer' : palettes de couleurs adaptées à la cartographie</span></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(RColorBrewer)</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="co"># 'classInt' : calcul des classes (intervalles égaux, quantiles, Fisher-Jenks...)</span></span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(classInt)</span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a><span class="co"># 'patchwork' : assembler plusieurs graphiques côte à côte</span></span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(patchwork)</span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a><span class="co"># 'ggspatial' : flèche du nord et échelle</span></span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(ggspatial)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Tip
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><code>patchwork</code> et <code>ggspatial</code> ne sont pas installés par défaut : <code>install.packages(c("patchwork", "ggspatial"))</code> si besoin.</p>
+</div>
+</div>
+</section>
+<section id="données" class="level2">
+<h2 class="anchored" data-anchor-id="données">Données</h2>
+<p>Nous allons travailler sur la <strong>densité de population des départements de France métropolitaine</strong>. Il nous faut deux sources :</p>
+<ul>
+<li><strong>Les contours des départements</strong> : fichier GADM v4.1, déjà présent dans le dossier <code>data/France/gadm41_FRA_shp/</code>. Le niveau 2 (<code>gadm41_FRA_2.shp</code>) correspond aux 96 départements métropolitains.</li>
+<li><strong>La population</strong> : les <em>populations légales 2022</em> de l’INSEE (recensement de la population), que nous téléchargeons directement depuis R.</li>
+</ul>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>Chemins des fichiers
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Ouvrez le projet en double-cliquant sur le fichier <code>.Rproj</code>. Le répertoire de travail est alors la racine du projet, et tous les chemins commencent par <code>data/...</code>. Pour vérifier où vous êtes : <code>getwd()</code>.</p>
+</div>
+</div>
+<section id="les-contours-des-départements" class="level3">
+<h3 class="anchored" data-anchor-id="les-contours-des-départements">Les contours des départements</h3>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>dep <span class="ot">&lt;-</span> <span class="fu">read_sf</span>(<span class="st">"data/France/gadm41_FRA_shp/gadm41_FRA_2.shp"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<p>Avant d’aller plus loin, vérifiez le <code>CRS</code> de l’objet <code>sf</code> ainsi que le contenu du tableau.</p>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center collapsed" data-bs-toggle="collapse" data-bs-target=".callout-3-contents" aria-controls="callout-3" aria-expanded="false" aria-label="Toggle callout">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Réponse
+</div>
+<div class="callout-btn-toggle d-inline-block border-0 py-1 ps-1 pe-0 float-end"><i class="callout-toggle"></i></div>
+</div>
+<div id="callout-3" class="callout-3-contents callout-collapse collapse">
+<div class="callout-body-container callout-body">
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="fu">st_crs</span>(dep)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Coordinate Reference System:
+  User input: WGS 84 
+  wkt:
+GEOGCRS["WGS 84",
+    DATUM["World Geodetic System 1984",
+        ELLIPSOID["WGS 84",6378137,298.257223563,
+            LENGTHUNIT["metre",1]]],
+    PRIMEM["Greenwich",0,
+        ANGLEUNIT["degree",0.0174532925199433]],
+    CS[ellipsoidal,2],
+        AXIS["latitude",north,
+            ORDER[1],
+            ANGLEUNIT["degree",0.0174532925199433]],
+        AXIS["longitude",east,
+            ORDER[2],
+            ANGLEUNIT["degree",0.0174532925199433]],
+    ID["EPSG",4326]]</code></pre>
+</div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="fu">head</span>(dep)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Simple feature collection with 6 features and 13 fields
+Geometry type: MULTIPOLYGON
+Dimension:     XY
+Bounding box:  xmin: 2.062914 ymin: 44.11572 xmax: 6.168451 ymax: 46.80387
+Geodetic CRS:  WGS 84
+# A tibble: 6 × 14
+  GID_2   GID_0 COUNTRY GID_1 NAME_1 NL_NAME_1 NAME_2 VARNAME_2 NL_NAME_2 TYPE_2
+  &lt;chr&gt;   &lt;chr&gt; &lt;chr&gt;   &lt;chr&gt; &lt;chr&gt;  &lt;chr&gt;     &lt;chr&gt;  &lt;chr&gt;     &lt;chr&gt;     &lt;chr&gt; 
+1 FRA.1.… FRA   France  FRA.… Auver… NA        Ain    NA        NA        Dépar…
+2 FRA.1.… FRA   France  FRA.… Auver… NA        Allier Basses-A… NA        Dépar…
+3 FRA.1.… FRA   France  FRA.… Auver… NA        Ardèc… NA        NA        Dépar…
+4 FRA.1.… FRA   France  FRA.… Auver… NA        Cantal NA        NA        Dépar…
+5 FRA.1.… FRA   France  FRA.… Auver… NA        Drôme  NA        NA        Dépar…
+6 FRA.1.… FRA   France  FRA.… Auver… NA        Haute… NA        NA        Dépar…
+# ℹ 4 more variables: ENGTYPE_2 &lt;chr&gt;, CC_2 &lt;chr&gt;, HASC_2 &lt;chr&gt;,
+#   geometry &lt;MULTIPOLYGON [°]&gt;</code></pre>
+</div>
+</div>
+<p>Les données sont en coordonnées géographiques (WGS 84, EPSG:4326), en degrés. Pour calculer des surfaces en m², il faut les projeter dans un système métrique. Pour la France métropolitaine, le système de référence est le <strong>Lambert 93 (EPSG:2154)</strong>.</p>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>dep <span class="ot">&lt;-</span> <span class="fu">st_transform</span>(dep, <span class="dv">2154</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</section>
+<section id="la-population-insee" class="level3">
+<h3 class="anchored" data-anchor-id="la-population-insee">La population (INSEE)</h3>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb8"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Télécharger le fichier une seule fois</span></span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a><span class="fu">options</span>(<span class="at">timeout =</span> <span class="dv">300</span>)</span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> (<span class="sc">!</span><span class="fu">file.exists</span>(<span class="st">"data/France/pop2022.zip"</span>)) {</span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">download.file</span>(<span class="st">"https://www.insee.fr/fr/statistiques/fichier/8290591/ensemble.zip"</span>,</span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>                <span class="st">"data/France/pop2022.zip"</span>, <span class="at">mode =</span> <span class="st">"wb"</span>)</span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a><span class="fu">unzip</span>(<span class="st">"data/France/pop2022.zip"</span>, <span class="at">exdir =</span> <span class="st">"data/France/pop2022"</span>)</span>
+<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a><span class="co"># Quels fichiers contient l'archive ?</span></span>
+<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a><span class="fu">list.files</span>(<span class="st">"data/France/pop2022"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>[1] "donnees_arrondissements.csv"      "donnees_cantons.csv"             
+[3] "donnees_collectivites.csv"        "donnees_communes_deleguees.csv"  
+[5] "donnees_communes.csv"             "donnees_departements.csv"        
+[7] "donnees_fractions_cantonales.csv" "donnees_regions.csv"             
+[9] "metadonnees.csv"                 </code></pre>
+</div>
+</div>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb10"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="co"># On garde le code département en texte : "01", "2A", "2B"...</span></span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>pop <span class="ot">&lt;-</span> <span class="fu">read_delim</span>(<span class="st">"data/France/pop2022/donnees_departements.csv"</span>,</span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>                  <span class="at">delim =</span> <span class="st">";"</span>,</span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>                  <span class="at">col_types =</span> <span class="fu">cols</span>(<span class="at">DEP =</span> <span class="fu">col_character</span>()))</span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a><span class="fu">head</span>(pop)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 6 × 9
+  REG   Région                 DEP   Département NBARR NBCAN NBCOM   PMUN   PTOT
+  &lt;chr&gt; &lt;chr&gt;                  &lt;chr&gt; &lt;chr&gt;       &lt;dbl&gt; &lt;dbl&gt; &lt;dbl&gt;  &lt;dbl&gt;  &lt;dbl&gt;
+1 84    Auvergne-Rhône-Alpes   01    Ain             4    23   392 6.71e5 6.87e5
+2 32    Hauts-de-France        02    Aisne           5    21   798 5.26e5 5.37e5
+3 84    Auvergne-Rhône-Alpes   03    Allier          3    19   317 3.35e5 3.43e5
+4 93    Provence-Alpes-Côte d… 04    Alpes-de-H…     4    15   198 1.67e5 1.72e5
+5 93    Provence-Alpes-Côte d… 05    Hautes-Alp…     2    15   162 1.42e5 1.46e5
+6 93    Provence-Alpes-Côte d… 06    Alpes-Mari…     2    27   163 1.11e6 1.13e6</code></pre>
+</div>
+</div>
+<p>Les principales variables que nous utiliserons :</p>
+<ul>
+<li><code>CC_2</code> (GADM) et <code>DEP</code> (INSEE) : le code du département (<code>"01"</code>, <code>"2A"</code>, <code>"75"</code>…), qui sert de clé de jointure</li>
+<li><code>NAME_1</code> (GADM) : la région à laquelle appartient le département</li>
+<li><code>NAME_2</code> (GADM) : le nom du département</li>
+<li><code>PMUN</code> (INSEE) : la population municipale en 2022</li>
+<li><code>PTOT</code> (INSEE) : la population totale (population municipale + population « comptée à part »)</li>
+<li><code>NBCOM</code>, <code>NBCAN</code>, <code>NBARR</code> (INSEE) : le nombre de communes, de cantons et d’arrondissements</li>
+</ul>
+</section>
+<section id="jointure-et-calcul-de-la-densité" class="level3">
+<h3 class="anchored" data-anchor-id="jointure-et-calcul-de-la-densité">Jointure et calcul de la densité</h3>
+<p>Une population brute n’est pas une bonne variable pour une carte choroplèthe : les grands départements paraîtraient « importants » simplement parce qu’ils sont grands. On calcule donc une <strong>densité</strong> (habitants par km²).</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb12"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>dep <span class="ot">&lt;-</span> dep <span class="sc">%&gt;%</span></span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">left_join</span>(pop, <span class="at">by =</span> <span class="fu">c</span>(<span class="st">"CC_2"</span> <span class="ot">=</span> <span class="st">"DEP"</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">surface_km2 =</span> <span class="fu">as.numeric</span>(<span class="fu">st_area</span>(geometry)) <span class="sc">/</span> <span class="fl">1e6</span>,   <span class="co"># m² -&gt; km²</span></span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">densite     =</span> <span class="fu">round</span>(PMUN <span class="sc">/</span> surface_km2)</span>
+<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a>  )</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<p>Vérifiez que la jointure a fonctionné : combien de départements n’ont pas de population ?</p>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center collapsed" data-bs-toggle="collapse" data-bs-target=".callout-4-contents" aria-controls="callout-4" aria-expanded="false" aria-label="Toggle callout">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Réponse
+</div>
+<div class="callout-btn-toggle d-inline-block border-0 py-1 ps-1 pe-0 float-end"><i class="callout-toggle"></i></div>
+</div>
+<div id="callout-4" class="callout-4-contents callout-collapse collapse">
+<div class="callout-body-container callout-body">
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb13"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="fu">sum</span>(<span class="fu">is.na</span>(dep<span class="sc">$</span>densite))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>[1] 0</code></pre>
+</div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb15"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Les départements les plus et les moins denses</span></span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a>dep <span class="sc">%&gt;%</span></span>
+<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">st_drop_geometry</span>() <span class="sc">%&gt;%</span></span>
+<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(NAME_2, densite) <span class="sc">%&gt;%</span></span>
+<span id="cb15-5"><a href="#cb15-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">arrange</span>(<span class="fu">desc</span>(densite)) <span class="sc">%&gt;%</span></span>
+<span id="cb15-6"><a href="#cb15-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">slice</span>(<span class="fu">c</span>(<span class="dv">1</span><span class="sc">:</span><span class="dv">5</span>, <span class="dv">92</span><span class="sc">:</span><span class="dv">96</span>))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 10 × 2
+   NAME_2                  densite
+   &lt;chr&gt;                     &lt;dbl&gt;
+ 1 Paris                     20150
+ 2 Hauts-de-Seine             9424
+ 3 Seine-Saint-Denis          7091
+ 4 Val-de-Marne               5778
+ 5 Val-d'Oise                 1014
+ 6 Cantal                       25
+ 7 Hautes-Alpes                 25
+ 8 Alpes-de-Haute-Provence      24
+ 9 Creuse                       21
+10 Lozère                       15</code></pre>
+</div>
+</div>
+<p>Le résultat doit être <code>0</code>. Si certains départements sont <code>NA</code>, comparez <code>dep$CC_2</code> et <code>pop$DEP</code> : les codes doivent être écrits exactement de la même façon.</p>
+</div>
+</div>
+</div>
+<p>Nous sommes prêts à cartographier !</p>
+<p>Nous utilisons <code>ggplot2</code> dans tout le module (documentation <a href="https://ggplot2.tidyverse.org">ici</a>). Il existe d’autres bonnes options pour la cartographie thématique en R, comme <code>tmap</code> (<a href="https://cran.r-project.org/web/packages/tmap/vignettes/tmap-getstarted.html">ici</a>) ou <code>mapsf</code> (<a href="https://riatelab.github.io/mapsf/">ici</a>), mais nous restons sur <code>ggplot2</code> par cohérence avec le reste du cours.</p>
+</section>
+</section>
+<section id="valeurs-uniques" class="level2">
+<h2 class="anchored" data-anchor-id="valeurs-uniques">Valeurs uniques</h2>
+<p>Une carte choroplèthe pour une variable qualitative attribue simplement une couleur différente à chaque modalité. Les variables peuvent être nominales ou ordinales.</p>
+<p><strong>Nominale</strong> : les modalités sont des catégories <em>sans</em> ordre ni hiérarchie, par exemple « pomme », « banane », « orange ».</p>
+<p><strong>Ordinale</strong> : les modalités ont un <em>ordre</em> significatif, par exemple « faible », « moyen », « élevé ».</p>
+<p>Pour l’illustrer, cartographions la <strong>région</strong> à laquelle appartient chaque département (<code>NAME_1</code>). C’est une variable nominale : il n’y a pas de hiérarchie entre la Bretagne et l’Occitanie. <code>geom_sf</code> dessine les géométries et <code>fill</code> indique la variable qui remplit les polygones.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb17"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(<span class="at">data =</span> dep) <span class="sc">+</span></span>
+<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_sf</span>(<span class="fu">aes</span>(<span class="at">fill =</span> NAME_1), <span class="at">color =</span> <span class="st">"white"</span>, <span class="at">linewidth =</span> <span class="fl">0.2</span>) <span class="sc">+</span></span>
+<span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">fill =</span> <span class="st">"Région"</span>) <span class="sc">+</span></span>
+<span id="cb17-4"><a href="#cb17-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_void</span>()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="choropleths_France_files/figure-html/unnamed-chunk-8-1.png" class="img-fluid figure-img" width="768"></p>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="intervalles-égaux" class="level2">
+<h2 class="anchored" data-anchor-id="intervalles-égaux">Intervalles égaux</h2>
+<p>Pour représenter un phénomène continu, il faut choisir comment transformer chaque valeur en couleur. Une première solution est la méthode des <strong>intervalles égaux</strong> : on découpe l’étendue de la distribution (l’écart entre le minimum et le maximum) en classes de même amplitude, et on attribue à chacune une couleur d’une palette ordonnée.</p>
+<p>Pour en savoir plus sur le package <code>classInt</code>, voir <a href="https://www.rdocumentation.org/packages/classInt/versions/0.4-10/topics/classIntervals">ici</a>.</p>
+<p><strong>Étape 1</strong> : calculer les bornes des classes avec <code>classIntervals</code> et les attribuer aux données.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb18"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a>e_breaks <span class="ot">&lt;-</span> <span class="fu">classIntervals</span>(dep<span class="sc">$</span>densite, <span class="at">n =</span> <span class="dv">5</span>, <span class="at">style =</span> <span class="st">"equal"</span>)</span>
+<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a><span class="co"># Étiquettes lisibles : "15 – 4 042"</span></span>
+<span id="cb18-4"><a href="#cb18-4" aria-hidden="true" tabindex="-1"></a>brks   <span class="ot">&lt;-</span> <span class="fu">round</span>(e_breaks<span class="sc">$</span>brks)</span>
+<span id="cb18-5"><a href="#cb18-5" aria-hidden="true" tabindex="-1"></a>e_etiq <span class="ot">&lt;-</span> <span class="fu">paste</span>(<span class="fu">formatC</span>(<span class="fu">head</span>(brks, <span class="sc">-</span><span class="dv">1</span>), <span class="at">big.mark =</span> <span class="st">" "</span>, <span class="at">format =</span> <span class="st">"d"</span>), <span class="st">"–"</span>,</span>
+<span id="cb18-6"><a href="#cb18-6" aria-hidden="true" tabindex="-1"></a>                <span class="fu">formatC</span>(brks[<span class="sc">-</span><span class="dv">1</span>],       <span class="at">big.mark =</span> <span class="st">" "</span>, <span class="at">format =</span> <span class="st">"d"</span>))</span>
+<span id="cb18-7"><a href="#cb18-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-8"><a href="#cb18-8" aria-hidden="true" tabindex="-1"></a><span class="co"># Attribuer à chaque département sa classe</span></span>
+<span id="cb18-9"><a href="#cb18-9" aria-hidden="true" tabindex="-1"></a>dep<span class="sc">$</span>e_breaks <span class="ot">&lt;-</span> <span class="fu">cut</span>(dep<span class="sc">$</span>densite, e_breaks<span class="sc">$</span>brks, <span class="at">include.lowest =</span> <span class="cn">TRUE</span>, <span class="at">labels =</span> e_etiq)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<ul>
+<li><code>classIntervals()</code> : calcule les bornes des classes pour un vecteur numérique.</li>
+<li><code>n = 5</code> : on veut 5 classes.</li>
+<li><code>style = "equal"</code> : classes de même amplitude.</li>
+<li><code>include.lowest = TRUE</code> : inclut la valeur minimale dans la première classe (sinon le département le moins dense devient <code>NA</code>).</li>
+<li><code>labels = e_etiq</code> : des étiquettes lisibles pour la légende, avec un séparateur des milliers à la française.</li>
+</ul>
+<p><strong>Étape 2</strong> : cartographier. On ajoute dans la légende le nombre de départements de chaque classe.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb19"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a>num_bins <span class="ot">&lt;-</span> <span class="dv">5</span></span>
+<span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a>cmap <span class="ot">&lt;-</span> <span class="fu">brewer.pal</span>(num_bins, <span class="st">"YlOrRd"</span>)</span>
+<span id="cb19-3"><a href="#cb19-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb19-4"><a href="#cb19-4" aria-hidden="true" tabindex="-1"></a>n_classe <span class="ot">&lt;-</span> <span class="fu">table</span>(dep<span class="sc">$</span>e_breaks)</span>
+<span id="cb19-5"><a href="#cb19-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb19-6"><a href="#cb19-6" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(dep) <span class="sc">+</span></span>
+<span id="cb19-7"><a href="#cb19-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_sf</span>(<span class="fu">aes</span>(<span class="at">fill =</span> e_breaks), <span class="at">color =</span> <span class="st">"white"</span>, <span class="at">linewidth =</span> <span class="fl">0.2</span>) <span class="sc">+</span></span>
+<span id="cb19-8"><a href="#cb19-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_fill_manual</span>(</span>
+<span id="cb19-9"><a href="#cb19-9" aria-hidden="true" tabindex="-1"></a>    <span class="at">values =</span> <span class="fu">setNames</span>(cmap, e_etiq),               <span class="co"># une couleur par classe, même vide</span></span>
+<span id="cb19-10"><a href="#cb19-10" aria-hidden="true" tabindex="-1"></a>    <span class="at">labels =</span> <span class="fu">paste0</span>(e_etiq, <span class="st">"  (n = "</span>, n_classe, <span class="st">")"</span>),</span>
+<span id="cb19-11"><a href="#cb19-11" aria-hidden="true" tabindex="-1"></a>    <span class="at">name   =</span> <span class="st">"Habitants / km²"</span>,</span>
+<span id="cb19-12"><a href="#cb19-12" aria-hidden="true" tabindex="-1"></a>    <span class="at">drop   =</span> <span class="cn">FALSE</span>                                 <span class="co"># afficher toutes les classes, même vides</span></span>
+<span id="cb19-13"><a href="#cb19-13" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
+<span id="cb19-14"><a href="#cb19-14" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(</span>
+<span id="cb19-15"><a href="#cb19-15" aria-hidden="true" tabindex="-1"></a>    <span class="at">title    =</span> <span class="st">"Densité de population : intervalles égaux"</span>,</span>
+<span id="cb19-16"><a href="#cb19-16" aria-hidden="true" tabindex="-1"></a>    <span class="at">subtitle =</span> <span class="st">"5 classes de même amplitude"</span></span>
+<span id="cb19-17"><a href="#cb19-17" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
+<span id="cb19-18"><a href="#cb19-18" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_void</span>() <span class="sc">+</span></span>
+<span id="cb19-19"><a href="#cb19-19" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme</span>(</span>
+<span id="cb19-20"><a href="#cb19-20" aria-hidden="true" tabindex="-1"></a>    <span class="at">plot.title      =</span> <span class="fu">element_text</span>(<span class="at">face =</span> <span class="st">"bold"</span>, <span class="at">hjust =</span> <span class="fl">0.5</span>),</span>
+<span id="cb19-21"><a href="#cb19-21" aria-hidden="true" tabindex="-1"></a>    <span class="at">plot.subtitle   =</span> <span class="fu">element_text</span>(<span class="at">hjust =</span> <span class="fl">0.5</span>, <span class="at">color =</span> <span class="st">"grey40"</span>),</span>
+<span id="cb19-22"><a href="#cb19-22" aria-hidden="true" tabindex="-1"></a>    <span class="at">legend.position =</span> <span class="st">"right"</span></span>
+<span id="cb19-23"><a href="#cb19-23" aria-hidden="true" tabindex="-1"></a>  )</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="choropleths_France_files/figure-html/unnamed-chunk-10-1.png" class="img-fluid figure-img" width="768"></p>
+</figure>
+</div>
+</div>
+</div>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Les styles de <code>classIntervals</code>
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>La fonction <code>classIntervals</code> propose les styles suivants : “fixed”, “sd”, “equal”, “pretty”, “quantile”, “kmeans”, “hclust”, “bclust”, “fisher”, “jenks”, “dpih”, “headtails”, “maximum” ou “box”.</p>
+</div>
+</div>
+<p>Visualisons maintenant les bornes sur la distribution des données. On affiche côte à côte l’<strong>échelle réelle</strong> (où l’on voit que les bornes sont régulièrement espacées) et l’<strong>échelle logarithmique</strong> (où l’on voit où se trouvent réellement les départements).</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb20"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a>e_break_values_df <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(<span class="at">BreakValues =</span> e_breaks<span class="sc">$</span>brks)</span>
+<span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-3"><a href="#cb20-3" aria-hidden="true" tabindex="-1"></a>base <span class="ot">&lt;-</span> <span class="fu">ggplot</span>(dep, <span class="fu">aes</span>(<span class="at">x =</span> densite)) <span class="sc">+</span></span>
+<span id="cb20-4"><a href="#cb20-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_histogram</span>(<span class="at">bins =</span> <span class="dv">30</span>, <span class="at">fill =</span> <span class="st">"darkred"</span>, <span class="at">alpha =</span> <span class="fl">0.5</span>, <span class="at">color =</span> <span class="st">"white"</span>) <span class="sc">+</span></span>
+<span id="cb20-5"><a href="#cb20-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_vline</span>(<span class="at">data =</span> e_break_values_df, <span class="fu">aes</span>(<span class="at">xintercept =</span> BreakValues),</span>
+<span id="cb20-6"><a href="#cb20-6" aria-hidden="true" tabindex="-1"></a>             <span class="at">color =</span> <span class="st">"darkorange"</span>, <span class="at">linewidth =</span> <span class="fl">0.8</span>) <span class="sc">+</span></span>
+<span id="cb20-7"><a href="#cb20-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">y =</span> <span class="st">"Nombre de départements"</span>) <span class="sc">+</span></span>
+<span id="cb20-8"><a href="#cb20-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_minimal</span>()</span>
+<span id="cb20-9"><a href="#cb20-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-10"><a href="#cb20-10" aria-hidden="true" tabindex="-1"></a>p_lin <span class="ot">&lt;-</span> base <span class="sc">+</span></span>
+<span id="cb20-11"><a href="#cb20-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_x_continuous</span>(<span class="at">labels =</span> scales<span class="sc">::</span><span class="fu">label_number</span>(<span class="at">big.mark =</span> <span class="st">" "</span>)) <span class="sc">+</span></span>
+<span id="cb20-12"><a href="#cb20-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">x =</span> <span class="st">"Densité (habitants / km²)"</span>, <span class="at">subtitle =</span> <span class="st">"Échelle réelle"</span>)</span>
+<span id="cb20-13"><a href="#cb20-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-14"><a href="#cb20-14" aria-hidden="true" tabindex="-1"></a>p_log <span class="ot">&lt;-</span> base <span class="sc">+</span></span>
+<span id="cb20-15"><a href="#cb20-15" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_x_log10</span>(<span class="at">labels =</span> scales<span class="sc">::</span><span class="fu">label_number</span>(<span class="at">big.mark =</span> <span class="st">" "</span>)) <span class="sc">+</span></span>
+<span id="cb20-16"><a href="#cb20-16" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">x =</span> <span class="st">"Densité (habitants / km², échelle log)"</span>, <span class="at">subtitle =</span> <span class="st">"Échelle logarithmique"</span>)</span>
+<span id="cb20-17"><a href="#cb20-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-18"><a href="#cb20-18" aria-hidden="true" tabindex="-1"></a>p_lin <span class="sc">+</span> p_log <span class="sc">+</span></span>
+<span id="cb20-19"><a href="#cb20-19" aria-hidden="true" tabindex="-1"></a>  <span class="fu">plot_annotation</span>(<span class="at">title =</span> <span class="st">"Bornes des intervalles égaux"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="choropleths_France_files/figure-html/unnamed-chunk-11-1.png" class="img-fluid figure-img" width="768"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>La distribution est très <strong>asymétrique</strong> : la grande majorité des départements a une densité faible, et quelques-uns (Paris et la petite couronne) ont des valeurs extrêmes. Avec des intervalles égaux, presque tous les départements tombent dans la première classe.</p>
+</section>
+<section id="quantiles" class="level2">
+<h2 class="anchored" data-anchor-id="quantiles">Quantiles</h2>
+<p>Une solution pour obtenir des classes plus équilibrées est d’utiliser les <strong>quantiles</strong>. Par définition, chaque classe contient le même nombre d’observations : les valeurs sont triées, puis découpées en groupes de taille égale. Cette approche « par les effectifs » s’oppose à l’approche « par les valeurs » des intervalles égaux. Elle peut masquer l’ampleur des valeurs extrêmes, mais elle est souvent plus lisible pour des distributions asymétriques.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb21"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a>qt_breaks <span class="ot">&lt;-</span> <span class="fu">classIntervals</span>(dep<span class="sc">$</span>densite, <span class="at">n =</span> <span class="dv">5</span>, <span class="at">style =</span> <span class="st">"quantile"</span>)</span>
+<span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb21-3"><a href="#cb21-3" aria-hidden="true" tabindex="-1"></a>brks    <span class="ot">&lt;-</span> <span class="fu">round</span>(qt_breaks<span class="sc">$</span>brks)</span>
+<span id="cb21-4"><a href="#cb21-4" aria-hidden="true" tabindex="-1"></a>qt_etiq <span class="ot">&lt;-</span> <span class="fu">paste</span>(<span class="fu">formatC</span>(<span class="fu">head</span>(brks, <span class="sc">-</span><span class="dv">1</span>), <span class="at">big.mark =</span> <span class="st">" "</span>, <span class="at">format =</span> <span class="st">"d"</span>), <span class="st">"–"</span>,</span>
+<span id="cb21-5"><a href="#cb21-5" aria-hidden="true" tabindex="-1"></a>                 <span class="fu">formatC</span>(brks[<span class="sc">-</span><span class="dv">1</span>],       <span class="at">big.mark =</span> <span class="st">" "</span>, <span class="at">format =</span> <span class="st">"d"</span>))</span>
+<span id="cb21-6"><a href="#cb21-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb21-7"><a href="#cb21-7" aria-hidden="true" tabindex="-1"></a>dep<span class="sc">$</span>qt_breaks <span class="ot">&lt;-</span> <span class="fu">cut</span>(dep<span class="sc">$</span>densite, qt_breaks<span class="sc">$</span>brks, <span class="at">include.lowest =</span> <span class="cn">TRUE</span>, <span class="at">labels =</span> qt_etiq)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb22"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a>n_classe <span class="ot">&lt;-</span> <span class="fu">table</span>(dep<span class="sc">$</span>qt_breaks)</span>
+<span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb22-3"><a href="#cb22-3" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(dep) <span class="sc">+</span></span>
+<span id="cb22-4"><a href="#cb22-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_sf</span>(<span class="fu">aes</span>(<span class="at">fill =</span> qt_breaks), <span class="at">color =</span> <span class="st">"white"</span>, <span class="at">linewidth =</span> <span class="fl">0.2</span>) <span class="sc">+</span></span>
+<span id="cb22-5"><a href="#cb22-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_fill_manual</span>(</span>
+<span id="cb22-6"><a href="#cb22-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">values =</span> <span class="fu">setNames</span>(cmap, qt_etiq),</span>
+<span id="cb22-7"><a href="#cb22-7" aria-hidden="true" tabindex="-1"></a>    <span class="at">labels =</span> <span class="fu">paste0</span>(qt_etiq, <span class="st">"  (n = "</span>, n_classe, <span class="st">")"</span>),</span>
+<span id="cb22-8"><a href="#cb22-8" aria-hidden="true" tabindex="-1"></a>    <span class="at">name   =</span> <span class="st">"Habitants / km²"</span>,</span>
+<span id="cb22-9"><a href="#cb22-9" aria-hidden="true" tabindex="-1"></a>    <span class="at">drop   =</span> <span class="cn">FALSE</span></span>
+<span id="cb22-10"><a href="#cb22-10" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
+<span id="cb22-11"><a href="#cb22-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(</span>
+<span id="cb22-12"><a href="#cb22-12" aria-hidden="true" tabindex="-1"></a>    <span class="at">title    =</span> <span class="st">"Densité de population : quantiles"</span>,</span>
+<span id="cb22-13"><a href="#cb22-13" aria-hidden="true" tabindex="-1"></a>    <span class="at">subtitle =</span> <span class="st">"5 classes de même effectif"</span></span>
+<span id="cb22-14"><a href="#cb22-14" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
+<span id="cb22-15"><a href="#cb22-15" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_void</span>() <span class="sc">+</span></span>
+<span id="cb22-16"><a href="#cb22-16" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme</span>(</span>
+<span id="cb22-17"><a href="#cb22-17" aria-hidden="true" tabindex="-1"></a>    <span class="at">plot.title      =</span> <span class="fu">element_text</span>(<span class="at">face =</span> <span class="st">"bold"</span>, <span class="at">hjust =</span> <span class="fl">0.5</span>),</span>
+<span id="cb22-18"><a href="#cb22-18" aria-hidden="true" tabindex="-1"></a>    <span class="at">plot.subtitle   =</span> <span class="fu">element_text</span>(<span class="at">hjust =</span> <span class="fl">0.5</span>, <span class="at">color =</span> <span class="st">"grey40"</span>),</span>
+<span id="cb22-19"><a href="#cb22-19" aria-hidden="true" tabindex="-1"></a>    <span class="at">legend.position =</span> <span class="st">"right"</span></span>
+<span id="cb22-20"><a href="#cb22-20" aria-hidden="true" tabindex="-1"></a>  )</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="choropleths_France_files/figure-html/unnamed-chunk-13-1.png" class="img-fluid figure-img" width="768"></p>
+</figure>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb23"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a>qt_break_values_df <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(<span class="at">BreakValues =</span> qt_breaks<span class="sc">$</span>brks)</span>
+<span id="cb23-2"><a href="#cb23-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb23-3"><a href="#cb23-3" aria-hidden="true" tabindex="-1"></a>base <span class="ot">&lt;-</span> <span class="fu">ggplot</span>(dep, <span class="fu">aes</span>(<span class="at">x =</span> densite)) <span class="sc">+</span></span>
+<span id="cb23-4"><a href="#cb23-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_histogram</span>(<span class="at">bins =</span> <span class="dv">30</span>, <span class="at">fill =</span> <span class="st">"darkred"</span>, <span class="at">alpha =</span> <span class="fl">0.5</span>, <span class="at">color =</span> <span class="st">"white"</span>) <span class="sc">+</span></span>
+<span id="cb23-5"><a href="#cb23-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_vline</span>(<span class="at">data =</span> qt_break_values_df, <span class="fu">aes</span>(<span class="at">xintercept =</span> BreakValues),</span>
+<span id="cb23-6"><a href="#cb23-6" aria-hidden="true" tabindex="-1"></a>             <span class="at">color =</span> <span class="st">"darkorange"</span>, <span class="at">linewidth =</span> <span class="fl">0.8</span>) <span class="sc">+</span></span>
+<span id="cb23-7"><a href="#cb23-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">y =</span> <span class="st">"Nombre de départements"</span>) <span class="sc">+</span></span>
+<span id="cb23-8"><a href="#cb23-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_minimal</span>()</span>
+<span id="cb23-9"><a href="#cb23-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb23-10"><a href="#cb23-10" aria-hidden="true" tabindex="-1"></a>p_lin <span class="ot">&lt;-</span> base <span class="sc">+</span></span>
+<span id="cb23-11"><a href="#cb23-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_x_continuous</span>(<span class="at">labels =</span> scales<span class="sc">::</span><span class="fu">label_number</span>(<span class="at">big.mark =</span> <span class="st">" "</span>)) <span class="sc">+</span></span>
+<span id="cb23-12"><a href="#cb23-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">x =</span> <span class="st">"Densité (habitants / km²)"</span>, <span class="at">subtitle =</span> <span class="st">"Échelle réelle"</span>)</span>
+<span id="cb23-13"><a href="#cb23-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb23-14"><a href="#cb23-14" aria-hidden="true" tabindex="-1"></a>p_log <span class="ot">&lt;-</span> base <span class="sc">+</span></span>
+<span id="cb23-15"><a href="#cb23-15" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_x_log10</span>(<span class="at">labels =</span> scales<span class="sc">::</span><span class="fu">label_number</span>(<span class="at">big.mark =</span> <span class="st">" "</span>)) <span class="sc">+</span></span>
+<span id="cb23-16"><a href="#cb23-16" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">x =</span> <span class="st">"Densité (habitants / km², échelle log)"</span>, <span class="at">subtitle =</span> <span class="st">"Échelle logarithmique"</span>)</span>
+<span id="cb23-17"><a href="#cb23-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb23-18"><a href="#cb23-18" aria-hidden="true" tabindex="-1"></a>p_lin <span class="sc">+</span> p_log <span class="sc">+</span></span>
+<span id="cb23-19"><a href="#cb23-19" aria-hidden="true" tabindex="-1"></a>  <span class="fu">plot_annotation</span>(<span class="at">title =</span> <span class="st">"Bornes des quantiles"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="choropleths_France_files/figure-html/unnamed-chunk-14-1.png" class="img-fluid figure-img" width="768"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Sur l’échelle réelle, les bornes des quantiles sont toutes regroupées près de zéro, à l’inverse des intervalles égaux : chaque classe contient le même nombre de départements, quelle que soit l’amplitude des valeurs.</p>
+</section>
+<section id="fisher-jenks" class="level2">
+<h2 class="anchored" data-anchor-id="fisher-jenks">Fisher-Jenks</h2>
+<p>Les intervalles égaux et les quantiles ne sont que deux méthodes parmi d’autres. Une méthode plus élaborée est celle de <strong>Fisher-Jenks</strong>, qui cherche les « ruptures naturelles » de la distribution : elle minimise les écarts à l’intérieur de chaque classe et maximise les écarts entre les classes.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb24"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a>fish_breaks <span class="ot">&lt;-</span> <span class="fu">classIntervals</span>(dep<span class="sc">$</span>densite, <span class="at">n =</span> <span class="dv">5</span>, <span class="at">style =</span> <span class="st">"fisher"</span>)</span>
+<span id="cb24-2"><a href="#cb24-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb24-3"><a href="#cb24-3" aria-hidden="true" tabindex="-1"></a>brks      <span class="ot">&lt;-</span> <span class="fu">round</span>(fish_breaks<span class="sc">$</span>brks)</span>
+<span id="cb24-4"><a href="#cb24-4" aria-hidden="true" tabindex="-1"></a>fish_etiq <span class="ot">&lt;-</span> <span class="fu">paste</span>(<span class="fu">formatC</span>(<span class="fu">head</span>(brks, <span class="sc">-</span><span class="dv">1</span>), <span class="at">big.mark =</span> <span class="st">" "</span>, <span class="at">format =</span> <span class="st">"d"</span>), <span class="st">"–"</span>,</span>
+<span id="cb24-5"><a href="#cb24-5" aria-hidden="true" tabindex="-1"></a>                   <span class="fu">formatC</span>(brks[<span class="sc">-</span><span class="dv">1</span>],       <span class="at">big.mark =</span> <span class="st">" "</span>, <span class="at">format =</span> <span class="st">"d"</span>))</span>
+<span id="cb24-6"><a href="#cb24-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb24-7"><a href="#cb24-7" aria-hidden="true" tabindex="-1"></a>dep<span class="sc">$</span>fish_breaks <span class="ot">&lt;-</span> <span class="fu">cut</span>(dep<span class="sc">$</span>densite, fish_breaks<span class="sc">$</span>brks, <span class="at">include.lowest =</span> <span class="cn">TRUE</span>, <span class="at">labels =</span> fish_etiq)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb25"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a>n_classe <span class="ot">&lt;-</span> <span class="fu">table</span>(dep<span class="sc">$</span>fish_breaks)</span>
+<span id="cb25-2"><a href="#cb25-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-3"><a href="#cb25-3" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(dep) <span class="sc">+</span></span>
+<span id="cb25-4"><a href="#cb25-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_sf</span>(<span class="fu">aes</span>(<span class="at">fill =</span> fish_breaks), <span class="at">color =</span> <span class="st">"white"</span>, <span class="at">linewidth =</span> <span class="fl">0.2</span>) <span class="sc">+</span></span>
+<span id="cb25-5"><a href="#cb25-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_fill_manual</span>(</span>
+<span id="cb25-6"><a href="#cb25-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">values =</span> <span class="fu">setNames</span>(cmap, fish_etiq),</span>
+<span id="cb25-7"><a href="#cb25-7" aria-hidden="true" tabindex="-1"></a>    <span class="at">labels =</span> <span class="fu">paste0</span>(fish_etiq, <span class="st">"  (n = "</span>, n_classe, <span class="st">")"</span>),</span>
+<span id="cb25-8"><a href="#cb25-8" aria-hidden="true" tabindex="-1"></a>    <span class="at">name   =</span> <span class="st">"Habitants / km²"</span>,</span>
+<span id="cb25-9"><a href="#cb25-9" aria-hidden="true" tabindex="-1"></a>    <span class="at">drop   =</span> <span class="cn">FALSE</span></span>
+<span id="cb25-10"><a href="#cb25-10" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
+<span id="cb25-11"><a href="#cb25-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(</span>
+<span id="cb25-12"><a href="#cb25-12" aria-hidden="true" tabindex="-1"></a>    <span class="at">title    =</span> <span class="st">"Densité de population : Fisher-Jenks"</span>,</span>
+<span id="cb25-13"><a href="#cb25-13" aria-hidden="true" tabindex="-1"></a>    <span class="at">subtitle =</span> <span class="st">"5 classes selon les ruptures naturelles"</span></span>
+<span id="cb25-14"><a href="#cb25-14" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
+<span id="cb25-15"><a href="#cb25-15" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_void</span>() <span class="sc">+</span></span>
+<span id="cb25-16"><a href="#cb25-16" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme</span>(</span>
+<span id="cb25-17"><a href="#cb25-17" aria-hidden="true" tabindex="-1"></a>    <span class="at">plot.title      =</span> <span class="fu">element_text</span>(<span class="at">face =</span> <span class="st">"bold"</span>, <span class="at">hjust =</span> <span class="fl">0.5</span>),</span>
+<span id="cb25-18"><a href="#cb25-18" aria-hidden="true" tabindex="-1"></a>    <span class="at">plot.subtitle   =</span> <span class="fu">element_text</span>(<span class="at">hjust =</span> <span class="fl">0.5</span>, <span class="at">color =</span> <span class="st">"grey40"</span>),</span>
+<span id="cb25-19"><a href="#cb25-19" aria-hidden="true" tabindex="-1"></a>    <span class="at">legend.position =</span> <span class="st">"right"</span></span>
+<span id="cb25-20"><a href="#cb25-20" aria-hidden="true" tabindex="-1"></a>  )</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="choropleths_France_files/figure-html/unnamed-chunk-16-1.png" class="img-fluid figure-img" width="768"></p>
+</figure>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb26"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a>fish_break_values_df <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(<span class="at">BreakValues =</span> fish_breaks<span class="sc">$</span>brks)</span>
+<span id="cb26-2"><a href="#cb26-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb26-3"><a href="#cb26-3" aria-hidden="true" tabindex="-1"></a>base <span class="ot">&lt;-</span> <span class="fu">ggplot</span>(dep, <span class="fu">aes</span>(<span class="at">x =</span> densite)) <span class="sc">+</span></span>
+<span id="cb26-4"><a href="#cb26-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_histogram</span>(<span class="at">bins =</span> <span class="dv">30</span>, <span class="at">fill =</span> <span class="st">"darkred"</span>, <span class="at">alpha =</span> <span class="fl">0.5</span>, <span class="at">color =</span> <span class="st">"white"</span>) <span class="sc">+</span></span>
+<span id="cb26-5"><a href="#cb26-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_vline</span>(<span class="at">data =</span> fish_break_values_df, <span class="fu">aes</span>(<span class="at">xintercept =</span> BreakValues),</span>
+<span id="cb26-6"><a href="#cb26-6" aria-hidden="true" tabindex="-1"></a>             <span class="at">color =</span> <span class="st">"darkorange"</span>, <span class="at">linewidth =</span> <span class="fl">0.8</span>) <span class="sc">+</span></span>
+<span id="cb26-7"><a href="#cb26-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">y =</span> <span class="st">"Nombre de départements"</span>) <span class="sc">+</span></span>
+<span id="cb26-8"><a href="#cb26-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_minimal</span>()</span>
+<span id="cb26-9"><a href="#cb26-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb26-10"><a href="#cb26-10" aria-hidden="true" tabindex="-1"></a>p_lin <span class="ot">&lt;-</span> base <span class="sc">+</span></span>
+<span id="cb26-11"><a href="#cb26-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_x_continuous</span>(<span class="at">labels =</span> scales<span class="sc">::</span><span class="fu">label_number</span>(<span class="at">big.mark =</span> <span class="st">" "</span>)) <span class="sc">+</span></span>
+<span id="cb26-12"><a href="#cb26-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">x =</span> <span class="st">"Densité (habitants / km²)"</span>, <span class="at">subtitle =</span> <span class="st">"Échelle réelle"</span>)</span>
+<span id="cb26-13"><a href="#cb26-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb26-14"><a href="#cb26-14" aria-hidden="true" tabindex="-1"></a>p_log <span class="ot">&lt;-</span> base <span class="sc">+</span></span>
+<span id="cb26-15"><a href="#cb26-15" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_x_log10</span>(<span class="at">labels =</span> scales<span class="sc">::</span><span class="fu">label_number</span>(<span class="at">big.mark =</span> <span class="st">" "</span>)) <span class="sc">+</span></span>
+<span id="cb26-16"><a href="#cb26-16" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">x =</span> <span class="st">"Densité (habitants / km², échelle log)"</span>, <span class="at">subtitle =</span> <span class="st">"Échelle logarithmique"</span>)</span>
+<span id="cb26-17"><a href="#cb26-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb26-18"><a href="#cb26-18" aria-hidden="true" tabindex="-1"></a>p_lin <span class="sc">+</span> p_log <span class="sc">+</span></span>
+<span id="cb26-19"><a href="#cb26-19" aria-hidden="true" tabindex="-1"></a>  <span class="fu">plot_annotation</span>(<span class="at">title =</span> <span class="st">"Bornes de Fisher-Jenks"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="choropleths_France_files/figure-html/unnamed-chunk-17-1.png" class="img-fluid figure-img" width="768"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Les classes aux extrémités de la distribution couvrent une plage de valeurs beaucoup plus large que celles du milieu, car peu de départements ont des densités très élevées.</p>
+</section>
+<section id="zoomer-sur-la-carte" class="level2">
+<h2 class="anchored" data-anchor-id="zoomer-sur-la-carte">Zoomer sur la carte</h2>
+<p>Une carte de toute la France peut masquer des différences locales. Une solution est de zoomer sur une partie de la carte en définissant une emprise (<em>bounding box</em>).</p>
+<p>Zoomons sur l’<strong>Île-de-France</strong>, où les densités les plus fortes sont concentrées sur de très petits départements, presque invisibles sur la carte nationale. Plutôt que d’écrire des coordonnées à la main, on calcule l’emprise directement à partir des données :</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb27"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb27-1"><a href="#cb27-1" aria-hidden="true" tabindex="-1"></a>idf_bbox <span class="ot">&lt;-</span> dep <span class="sc">%&gt;%</span></span>
+<span id="cb27-2"><a href="#cb27-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(NAME_1 <span class="sc">==</span> <span class="st">"Île-de-France"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb27-3"><a href="#cb27-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">st_bbox</span>()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<p>On utilise ensuite <code>coord_sf</code> pour zoomer :</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb28"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(<span class="at">data =</span> dep) <span class="sc">+</span></span>
+<span id="cb28-2"><a href="#cb28-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_sf</span>(<span class="fu">aes</span>(<span class="at">fill =</span> fish_breaks), <span class="at">color =</span> <span class="st">"white"</span>, <span class="at">linewidth =</span> <span class="fl">0.3</span>) <span class="sc">+</span></span>
+<span id="cb28-3"><a href="#cb28-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_fill_manual</span>(<span class="at">values =</span> <span class="fu">setNames</span>(cmap, fish_etiq), <span class="at">name =</span> <span class="st">"Habitants / km²"</span>, <span class="at">drop =</span> <span class="cn">FALSE</span>) <span class="sc">+</span></span>
+<span id="cb28-4"><a href="#cb28-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">coord_sf</span>(<span class="at">xlim =</span> <span class="fu">c</span>(idf_bbox[<span class="st">"xmin"</span>], idf_bbox[<span class="st">"xmax"</span>]),</span>
+<span id="cb28-5"><a href="#cb28-5" aria-hidden="true" tabindex="-1"></a>           <span class="at">ylim =</span> <span class="fu">c</span>(idf_bbox[<span class="st">"ymin"</span>], idf_bbox[<span class="st">"ymax"</span>])) <span class="sc">+</span></span>
+<span id="cb28-6"><a href="#cb28-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">title =</span> <span class="st">"Densité de population : zoom sur l'Île-de-France"</span>) <span class="sc">+</span></span>
+<span id="cb28-7"><a href="#cb28-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_void</span>()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="choropleths_France_files/figure-html/unnamed-chunk-19-1.png" class="img-fluid figure-img" width="768"></p>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="une-carte-finale-avec-des-bornes-choisies-à-la-main" class="level2">
+<h2 class="anchored" data-anchor-id="une-carte-finale-avec-des-bornes-choisies-à-la-main">Une carte finale avec des bornes choisies à la main</h2>
+<p>Les algorithmes donnent des bornes comme 4 042 ou 8 069, difficiles à lire et à retenir. Pour une carte destinée à être publiée, on peut choisir soi-même des <strong>bornes arrondies</strong> qui ont un sens pour le lecteur :</p>
+<ul>
+<li><strong>moins de 50</strong> : départements ruraux peu peuplés (la « diagonale du vide ») ;</li>
+<li><strong>100</strong> : proche de la moyenne nationale (environ 120 hab/km²), pour distinguer d’un coup d’œil « au-dessus » et « en dessous » de la moyenne ;</li>
+<li><strong>250 et 1 000</strong> : départements avec une grande agglomération, puis départements très urbanisés ;</li>
+<li><strong>plus de 5 000</strong> : Paris et la petite couronne.</li>
+</ul>
+<p>On ajoute aussi un <strong>encart</strong> sur l’Île-de-France, dont les départements sont trop petits pour être lisibles à l’échelle nationale.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb29"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb29-1"><a href="#cb29-1" aria-hidden="true" tabindex="-1"></a><span class="co"># 1. Bornes choisies à la main</span></span>
+<span id="cb29-2"><a href="#cb29-2" aria-hidden="true" tabindex="-1"></a>bornes <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="dv">0</span>, <span class="dv">50</span>, <span class="dv">100</span>, <span class="dv">250</span>, <span class="dv">1000</span>, <span class="dv">5000</span>, <span class="cn">Inf</span>)</span>
+<span id="cb29-3"><a href="#cb29-3" aria-hidden="true" tabindex="-1"></a>etiq   <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">"Moins de 50"</span>, <span class="st">"50 – 100"</span>, <span class="st">"100 – 250"</span>,</span>
+<span id="cb29-4"><a href="#cb29-4" aria-hidden="true" tabindex="-1"></a>            <span class="st">"250 – 1 000"</span>, <span class="st">"1 000 – 5 000"</span>, <span class="st">"Plus de 5 000"</span>)</span>
+<span id="cb29-5"><a href="#cb29-5" aria-hidden="true" tabindex="-1"></a>dep<span class="sc">$</span>classe <span class="ot">&lt;-</span> <span class="fu">cut</span>(dep<span class="sc">$</span>densite, <span class="at">breaks =</span> bornes, <span class="at">labels =</span> etiq, <span class="at">right =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb29-6"><a href="#cb29-6" aria-hidden="true" tabindex="-1"></a>pal <span class="ot">&lt;-</span> <span class="fu">setNames</span>(<span class="fu">brewer.pal</span>(<span class="dv">6</span>, <span class="st">"YlOrRd"</span>), etiq)</span>
+<span id="cb29-7"><a href="#cb29-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb29-8"><a href="#cb29-8" aria-hidden="true" tabindex="-1"></a><span class="co"># 2. Carte principale</span></span>
+<span id="cb29-9"><a href="#cb29-9" aria-hidden="true" tabindex="-1"></a>carte <span class="ot">&lt;-</span> <span class="fu">ggplot</span>(dep) <span class="sc">+</span></span>
+<span id="cb29-10"><a href="#cb29-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_sf</span>(<span class="fu">aes</span>(<span class="at">fill =</span> classe), <span class="at">color =</span> <span class="st">"white"</span>, <span class="at">linewidth =</span> <span class="fl">0.15</span>) <span class="sc">+</span></span>
+<span id="cb29-11"><a href="#cb29-11" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Rectangle indiquant la zone de l'encart</span></span>
+<span id="cb29-12"><a href="#cb29-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">annotate</span>(<span class="st">"rect"</span>,</span>
+<span id="cb29-13"><a href="#cb29-13" aria-hidden="true" tabindex="-1"></a>           <span class="at">xmin =</span> idf_bbox[<span class="st">"xmin"</span>], <span class="at">xmax =</span> idf_bbox[<span class="st">"xmax"</span>],</span>
+<span id="cb29-14"><a href="#cb29-14" aria-hidden="true" tabindex="-1"></a>           <span class="at">ymin =</span> idf_bbox[<span class="st">"ymin"</span>], <span class="at">ymax =</span> idf_bbox[<span class="st">"ymax"</span>],</span>
+<span id="cb29-15"><a href="#cb29-15" aria-hidden="true" tabindex="-1"></a>           <span class="at">fill =</span> <span class="cn">NA</span>, <span class="at">color =</span> <span class="st">"grey20"</span>, <span class="at">linewidth =</span> <span class="fl">0.5</span>) <span class="sc">+</span></span>
+<span id="cb29-16"><a href="#cb29-16" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_fill_manual</span>(<span class="at">values =</span> pal, <span class="at">name =</span> <span class="st">"Habitants / km²"</span>, <span class="at">drop =</span> <span class="cn">FALSE</span>) <span class="sc">+</span></span>
+<span id="cb29-17"><a href="#cb29-17" aria-hidden="true" tabindex="-1"></a>  <span class="fu">annotation_scale</span>(<span class="at">location =</span> <span class="st">"br"</span>, <span class="at">width_hint =</span> <span class="fl">0.2</span>, <span class="at">style =</span> <span class="st">"ticks"</span>) <span class="sc">+</span></span>
+<span id="cb29-18"><a href="#cb29-18" aria-hidden="true" tabindex="-1"></a>  <span class="fu">annotation_north_arrow</span>(<span class="at">location =</span> <span class="st">"tl"</span>, <span class="at">which_north =</span> <span class="st">"true"</span>,</span>
+<span id="cb29-19"><a href="#cb29-19" aria-hidden="true" tabindex="-1"></a>                         <span class="at">height =</span> <span class="fu">unit</span>(<span class="dv">1</span>, <span class="st">"cm"</span>), <span class="at">width =</span> <span class="fu">unit</span>(<span class="dv">1</span>, <span class="st">"cm"</span>),</span>
+<span id="cb29-20"><a href="#cb29-20" aria-hidden="true" tabindex="-1"></a>                         <span class="at">style =</span> north_arrow_minimal) <span class="sc">+</span></span>
+<span id="cb29-21"><a href="#cb29-21" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(</span>
+<span id="cb29-22"><a href="#cb29-22" aria-hidden="true" tabindex="-1"></a>    <span class="at">title    =</span> <span class="st">"Densité de population en France métropolitaine"</span>,</span>
+<span id="cb29-23"><a href="#cb29-23" aria-hidden="true" tabindex="-1"></a>    <span class="at">subtitle =</span> <span class="st">"Par département, 2022"</span>,</span>
+<span id="cb29-24"><a href="#cb29-24" aria-hidden="true" tabindex="-1"></a>    <span class="at">caption  =</span> <span class="st">"Source : INSEE, populations légales 2022 ; GADM v4.1"</span></span>
+<span id="cb29-25"><a href="#cb29-25" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
+<span id="cb29-26"><a href="#cb29-26" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_void</span>(<span class="at">base_size =</span> <span class="dv">12</span>) <span class="sc">+</span></span>
+<span id="cb29-27"><a href="#cb29-27" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme</span>(</span>
+<span id="cb29-28"><a href="#cb29-28" aria-hidden="true" tabindex="-1"></a>    <span class="at">plot.title      =</span> <span class="fu">element_text</span>(<span class="at">face =</span> <span class="st">"bold"</span>, <span class="at">size =</span> <span class="dv">16</span>),</span>
+<span id="cb29-29"><a href="#cb29-29" aria-hidden="true" tabindex="-1"></a>    <span class="at">plot.subtitle   =</span> <span class="fu">element_text</span>(<span class="at">color =</span> <span class="st">"grey40"</span>),</span>
+<span id="cb29-30"><a href="#cb29-30" aria-hidden="true" tabindex="-1"></a>    <span class="at">plot.caption    =</span> <span class="fu">element_text</span>(<span class="at">size =</span> <span class="dv">8</span>, <span class="at">color =</span> <span class="st">"grey50"</span>),</span>
+<span id="cb29-31"><a href="#cb29-31" aria-hidden="true" tabindex="-1"></a>    <span class="at">legend.position =</span> <span class="st">"right"</span>,</span>
+<span id="cb29-32"><a href="#cb29-32" aria-hidden="true" tabindex="-1"></a>    <span class="at">plot.margin     =</span> <span class="fu">margin</span>(<span class="dv">10</span>, <span class="dv">10</span>, <span class="dv">10</span>, <span class="dv">10</span>)</span>
+<span id="cb29-33"><a href="#cb29-33" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb29-34"><a href="#cb29-34" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb29-35"><a href="#cb29-35" aria-hidden="true" tabindex="-1"></a><span class="co"># 3. Encart Île-de-France</span></span>
+<span id="cb29-36"><a href="#cb29-36" aria-hidden="true" tabindex="-1"></a>zoom <span class="ot">&lt;-</span> <span class="fu">ggplot</span>(dep) <span class="sc">+</span></span>
+<span id="cb29-37"><a href="#cb29-37" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_sf</span>(<span class="fu">aes</span>(<span class="at">fill =</span> classe), <span class="at">color =</span> <span class="st">"white"</span>, <span class="at">linewidth =</span> <span class="fl">0.3</span>, <span class="at">show.legend =</span> <span class="cn">FALSE</span>) <span class="sc">+</span></span>
+<span id="cb29-38"><a href="#cb29-38" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_fill_manual</span>(<span class="at">values =</span> pal) <span class="sc">+</span></span>
+<span id="cb29-39"><a href="#cb29-39" aria-hidden="true" tabindex="-1"></a>  <span class="fu">coord_sf</span>(<span class="at">xlim =</span> idf_bbox[<span class="fu">c</span>(<span class="st">"xmin"</span>, <span class="st">"xmax"</span>)],</span>
+<span id="cb29-40"><a href="#cb29-40" aria-hidden="true" tabindex="-1"></a>           <span class="at">ylim =</span> idf_bbox[<span class="fu">c</span>(<span class="st">"ymin"</span>, <span class="st">"ymax"</span>)], <span class="at">expand =</span> <span class="cn">FALSE</span>) <span class="sc">+</span></span>
+<span id="cb29-41"><a href="#cb29-41" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">title =</span> <span class="st">"Île-de-France"</span>) <span class="sc">+</span></span>
+<span id="cb29-42"><a href="#cb29-42" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_void</span>() <span class="sc">+</span></span>
+<span id="cb29-43"><a href="#cb29-43" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme</span>(</span>
+<span id="cb29-44"><a href="#cb29-44" aria-hidden="true" tabindex="-1"></a>    <span class="at">plot.title      =</span> <span class="fu">element_text</span>(<span class="at">size =</span> <span class="dv">9</span>, <span class="at">face =</span> <span class="st">"bold"</span>, <span class="at">hjust =</span> <span class="fl">0.5</span>,</span>
+<span id="cb29-45"><a href="#cb29-45" aria-hidden="true" tabindex="-1"></a>                                   <span class="at">margin =</span> <span class="fu">margin</span>(<span class="at">b =</span> <span class="dv">3</span>)),</span>
+<span id="cb29-46"><a href="#cb29-46" aria-hidden="true" tabindex="-1"></a>    <span class="at">plot.background =</span> <span class="fu">element_rect</span>(<span class="at">fill =</span> <span class="st">"white"</span>, <span class="at">color =</span> <span class="st">"grey20"</span>, <span class="at">linewidth =</span> <span class="fl">0.6</span>),</span>
+<span id="cb29-47"><a href="#cb29-47" aria-hidden="true" tabindex="-1"></a>    <span class="at">plot.margin     =</span> <span class="fu">margin</span>(<span class="dv">4</span>, <span class="dv">4</span>, <span class="dv">4</span>, <span class="dv">4</span>)</span>
+<span id="cb29-48"><a href="#cb29-48" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb29-49"><a href="#cb29-49" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb29-50"><a href="#cb29-50" aria-hidden="true" tabindex="-1"></a><span class="co"># 4. Assemblage : l'encart en bas à gauche</span></span>
+<span id="cb29-51"><a href="#cb29-51" aria-hidden="true" tabindex="-1"></a>carte <span class="sc">+</span> <span class="fu">inset_element</span>(zoom, <span class="at">left =</span> <span class="dv">0</span>, <span class="at">bottom =</span> <span class="fl">0.02</span>, <span class="at">right =</span> <span class="fl">0.3</span>, <span class="at">top =</span> <span class="fl">0.4</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="choropleths_France_files/figure-html/unnamed-chunk-20-1.png" class="img-fluid figure-img" width="864"></p>
+</figure>
+</div>
+</div>
+</div>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Tip
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><code>which_north = "true"</code> oriente la flèche vers le nord géographique réel plutôt que simplement vers le haut de la carte. Si l’encart chevauche la Bretagne, ajustez les valeurs <code>left</code>, <code>bottom</code>, <code>right</code> et <code>top</code> de <code>inset_element()</code>.</p>
+</div>
+</div>
+</section>
+<section id="exercice" class="level2">
+<h2 class="anchored" data-anchor-id="exercice">Exercice</h2>
+<p>À vous de jouer ! Jusqu’ici, nous avons travaillé ensemble sur la densité de population. Vous allez maintenant appliquer la même démarche à <strong>une autre variable de votre choix</strong>, en utilisant le tableau <code>dep</code> préparé ci-dessus.</p>
+<section id="étape-0-choisir-et-construire-votre-variable" class="level3">
+<h3 class="anchored" data-anchor-id="étape-0-choisir-et-construire-votre-variable">Étape 0 : choisir et construire votre variable</h3>
+<p>Choisissez <strong>une</strong> variable dans la liste ci-dessous. Toutes peuvent être calculées à partir des colonnes déjà présentes dans <code>dep</code> (<code>PMUN</code>, <code>PTOT</code>, <code>NBCOM</code>, <code>NBCAN</code>, <code>surface_km2</code>).</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Variable</th>
+<th>Calcul en R</th>
+<th>Question géographique</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Population moyenne par commune</td>
+<td><code>PMUN / NBCOM</code></td>
+<td>Où les communes sont-elles très peuplées, où sont-elles nombreuses et petites ?</td>
+</tr>
+<tr class="even">
+<td>Surface moyenne des communes (km²)</td>
+<td><code>surface_km2 / NBCOM</code></td>
+<td>Le maillage communal est-il plus fin au nord ou au sud ?</td>
+</tr>
+<tr class="odd">
+<td>Part de la population « comptée à part » (%)</td>
+<td><code>(PTOT - PMUN) / PTOT * 100</code></td>
+<td>Où vivent proportionnellement le plus d’étudiants en internat, de militaires, de personnes en maison de retraite… ?</td>
+</tr>
+<tr class="even">
+<td>Population moyenne par canton</td>
+<td><code>PMUN / NBCAN</code></td>
+<td>Les cantons ont-ils tous un poids démographique comparable ?</td>
+</tr>
+</tbody>
+</table>
+<p>Exemple, pour la population moyenne par commune :</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb30"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb30-1"><a href="#cb30-1" aria-hidden="true" tabindex="-1"></a>dep <span class="ot">&lt;-</span> dep <span class="sc">%&gt;%</span></span>
+<span id="cb30-2"><a href="#cb30-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">pop_par_commune =</span> <span class="fu">round</span>(PMUN <span class="sc">/</span> NBCOM))</span>
+<span id="cb30-3"><a href="#cb30-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb30-4"><a href="#cb30-4" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(dep<span class="sc">$</span>pop_par_commune)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div class="callout callout-style-default callout-warning callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Warning</span>Attention aux effectifs bruts
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Ne cartographiez pas directement une variable de <strong>stock</strong> comme <code>PMUN</code> (population) ou <code>NBCOM</code> (nombre de communes) en aplats de couleur : un grand département paraîtrait « important » simplement parce qu’il est grand. Une carte choroplèthe représente un <strong>ratio</strong> (densité, taux, part, moyenne). C’est pour cela que toutes les variables proposées sont des rapports.</p>
+</div>
+</div>
+</section>
+<section id="étape-1-explorer-la-distribution" class="level3">
+<h3 class="anchored" data-anchor-id="étape-1-explorer-la-distribution">Étape 1 : explorer la distribution</h3>
+<p>Avant de cartographier, regardez la distribution de votre variable avec un histogramme (en échelle réelle et en échelle logarithmique, comme dans les sections précédentes).</p>
+<ul>
+<li>La distribution est-elle <strong>symétrique</strong> ou <strong>asymétrique</strong> ?</li>
+<li>Y a-t-il des <strong>valeurs extrêmes</strong> ? Lesquelles (quels départements) ?</li>
+</ul>
+</section>
+<section id="étape-2-comparer-trois-méthodes-de-classification" class="level3">
+<h3 class="anchored" data-anchor-id="étape-2-comparer-trois-méthodes-de-classification">Étape 2 : comparer trois méthodes de classification</h3>
+<ol type="1">
+<li><strong>Cartographiez</strong> votre variable avec <strong>3 méthodes</strong> de classification en <code>ggplot2</code> (par exemple intervalles égaux, quantiles et Fisher-Jenks), avec le <strong>même nombre de classes</strong> pour pouvoir les comparer.</li>
+<li><strong>Pour chaque carte, justifiez en une phrase</strong> pourquoi cette méthode est adaptée (ou non) à votre variable, en vous appuyant sur l’histogramme de l’étape 1.</li>
+</ol>
+</section>
+<section id="étape-3-choisir-la-palette" class="level3">
+<h3 class="anchored" data-anchor-id="étape-3-choisir-la-palette">Étape 3 : choisir la palette</h3>
+<ol start="3" type="1">
+<li><strong>Choisissez la palette la plus appropriée</strong> et justifiez votre choix. Demandez-vous :
+<ul>
+<li>Ma variable est-elle <strong>ordonnée</strong> (de faible à fort) ? → palette <strong>séquentielle</strong></li>
+<li>A-t-elle une <strong>valeur de référence</strong> au centre (par exemple la moyenne nationale), avec des écarts au-dessus et en dessous ? → palette <strong>divergente</strong></li>
+<li>Est-elle <strong>qualitative</strong> (des catégories sans ordre) ? → palette <strong>qualitative</strong></li>
+</ul></li>
+</ol>
+<p>Pour voir toutes les palettes disponibles : <code>RColorBrewer::display.brewer.all()</code>.</p>
+</section>
+<section id="étape-4-la-carte-finale" class="level3">
+<h3 class="anchored" data-anchor-id="étape-4-la-carte-finale">Étape 4 : la carte finale</h3>
+<ol start="4" type="1">
+<li><strong>Produisez une carte finale complète</strong>, en vous inspirant de la carte avec bornes choisies à la main. Elle doit comporter :
+<ul>
+<li>un <strong>titre</strong> qui dit <em>quoi</em>, <em>où</em> et <em>quand</em> ;</li>
+<li>un <strong>sous-titre</strong> qui précise l’unité spatiale et la méthode de classification ;</li>
+<li>une <strong>légende</strong> avec un intitulé et une unité (« habitants », « km² », « % ») ;</li>
+<li>la <strong>source</strong> des données ;</li>
+<li>une <strong>flèche du nord</strong> et une <strong>échelle</strong> (<code>ggspatial</code>).</li>
+</ul></li>
+</ol>
+<p><strong>Bonus 1 :</strong> remplacez les bornes de l’algorithme par des <strong>bornes arrondies</strong> que vous choisissez vous-même, et justifiez-les (comme nous l’avons fait pour la densité).</p>
+<p><strong>Bonus 2 :</strong> superposez la <strong>population</strong> (<code>PMUN</code>) en <strong>symboles proportionnels</strong> sur votre carte finale. Pourquoi la population se représente-t-elle mieux en cercles qu’en aplats de couleur ?</p>
+</section>
+<section id="point-de-départ" class="level3">
+<h3 class="anchored" data-anchor-id="point-de-départ">Point de départ</h3>
+<p>Copiez ce code dans un nouveau bloc et remplacez les <code>...</code> par vos propres choix.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb31"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb31-1"><a href="#cb31-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Votre code ici — remplacez les ... par vos paramètres</span></span>
+<span id="cb31-2"><a href="#cb31-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb31-3"><a href="#cb31-3" aria-hidden="true" tabindex="-1"></a><span class="co"># Étape 0 : construire votre variable</span></span>
+<span id="cb31-4"><a href="#cb31-4" aria-hidden="true" tabindex="-1"></a>dep <span class="ot">&lt;-</span> dep <span class="sc">%&gt;%</span></span>
+<span id="cb31-5"><a href="#cb31-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">ma_variable =</span> ...)</span>
+<span id="cb31-6"><a href="#cb31-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb31-7"><a href="#cb31-7" aria-hidden="true" tabindex="-1"></a><span class="co"># Étape 2 : calculer les classes ("equal", "quantile", "fisher"...)</span></span>
+<span id="cb31-8"><a href="#cb31-8" aria-hidden="true" tabindex="-1"></a>breaks_ex <span class="ot">&lt;-</span> <span class="fu">classIntervals</span>(dep<span class="sc">$</span>ma_variable, <span class="at">n =</span> <span class="dv">5</span>, <span class="at">style =</span> <span class="st">"..."</span>)</span>
+<span id="cb31-9"><a href="#cb31-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb31-10"><a href="#cb31-10" aria-hidden="true" tabindex="-1"></a>brks    <span class="ot">&lt;-</span> <span class="fu">round</span>(breaks_ex<span class="sc">$</span>brks)</span>
+<span id="cb31-11"><a href="#cb31-11" aria-hidden="true" tabindex="-1"></a>etiq_ex <span class="ot">&lt;-</span> <span class="fu">paste</span>(<span class="fu">formatC</span>(<span class="fu">head</span>(brks, <span class="sc">-</span><span class="dv">1</span>), <span class="at">big.mark =</span> <span class="st">" "</span>, <span class="at">format =</span> <span class="st">"d"</span>), <span class="st">"–"</span>,</span>
+<span id="cb31-12"><a href="#cb31-12" aria-hidden="true" tabindex="-1"></a>                 <span class="fu">formatC</span>(brks[<span class="sc">-</span><span class="dv">1</span>],       <span class="at">big.mark =</span> <span class="st">" "</span>, <span class="at">format =</span> <span class="st">"d"</span>))</span>
+<span id="cb31-13"><a href="#cb31-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb31-14"><a href="#cb31-14" aria-hidden="true" tabindex="-1"></a>dep<span class="sc">$</span>classe_ex <span class="ot">&lt;-</span> <span class="fu">cut</span>(dep<span class="sc">$</span>ma_variable, breaks_ex<span class="sc">$</span>brks,</span>
+<span id="cb31-15"><a href="#cb31-15" aria-hidden="true" tabindex="-1"></a>                     <span class="at">include.lowest =</span> <span class="cn">TRUE</span>, <span class="at">labels =</span> etiq_ex)</span>
+<span id="cb31-16"><a href="#cb31-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb31-17"><a href="#cb31-17" aria-hidden="true" tabindex="-1"></a><span class="co"># Étapes 3 et 4 : palette et carte finale</span></span>
+<span id="cb31-18"><a href="#cb31-18" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(dep) <span class="sc">+</span></span>
+<span id="cb31-19"><a href="#cb31-19" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_sf</span>(<span class="fu">aes</span>(<span class="at">fill =</span> classe_ex), <span class="at">color =</span> <span class="st">"white"</span>, <span class="at">linewidth =</span> <span class="fl">0.2</span>) <span class="sc">+</span></span>
+<span id="cb31-20"><a href="#cb31-20" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_fill_brewer</span>(<span class="at">palette =</span> <span class="st">"..."</span>, <span class="at">name =</span> <span class="st">"..."</span>) <span class="sc">+</span></span>
+<span id="cb31-21"><a href="#cb31-21" aria-hidden="true" tabindex="-1"></a>  <span class="fu">annotation_scale</span>(<span class="at">location =</span> <span class="st">"br"</span>, <span class="at">width_hint =</span> <span class="fl">0.2</span>, <span class="at">style =</span> <span class="st">"ticks"</span>) <span class="sc">+</span></span>
+<span id="cb31-22"><a href="#cb31-22" aria-hidden="true" tabindex="-1"></a>  <span class="fu">annotation_north_arrow</span>(<span class="at">location =</span> <span class="st">"tl"</span>, <span class="at">which_north =</span> <span class="st">"true"</span>,</span>
+<span id="cb31-23"><a href="#cb31-23" aria-hidden="true" tabindex="-1"></a>                         <span class="at">height =</span> <span class="fu">unit</span>(<span class="dv">1</span>, <span class="st">"cm"</span>), <span class="at">width =</span> <span class="fu">unit</span>(<span class="dv">1</span>, <span class="st">"cm"</span>),</span>
+<span id="cb31-24"><a href="#cb31-24" aria-hidden="true" tabindex="-1"></a>                         <span class="at">style =</span> north_arrow_minimal) <span class="sc">+</span></span>
+<span id="cb31-25"><a href="#cb31-25" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">title =</span> <span class="st">"..."</span>, <span class="at">subtitle =</span> <span class="st">"..."</span>, <span class="at">caption =</span> <span class="st">"..."</span>) <span class="sc">+</span></span>
+<span id="cb31-26"><a href="#cb31-26" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_void</span>()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<p>Pour le bonus 2, voici une piste :</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb32"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb32-1"><a href="#cb32-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Un point à l'intérieur de chaque département</span></span>
+<span id="cb32-2"><a href="#cb32-2" aria-hidden="true" tabindex="-1"></a>dep_points <span class="ot">&lt;-</span> <span class="fu">st_point_on_surface</span>(dep)</span>
+<span id="cb32-3"><a href="#cb32-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb32-4"><a href="#cb32-4" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>() <span class="sc">+</span></span>
+<span id="cb32-5"><a href="#cb32-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_sf</span>(<span class="at">data =</span> dep, <span class="fu">aes</span>(<span class="at">fill =</span> classe_ex), <span class="at">color =</span> <span class="st">"white"</span>, <span class="at">linewidth =</span> <span class="fl">0.2</span>) <span class="sc">+</span></span>
+<span id="cb32-6"><a href="#cb32-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_sf</span>(<span class="at">data =</span> dep_points, <span class="fu">aes</span>(<span class="at">size =</span> PMUN),</span>
+<span id="cb32-7"><a href="#cb32-7" aria-hidden="true" tabindex="-1"></a>          <span class="at">shape =</span> <span class="dv">21</span>, <span class="at">fill =</span> <span class="cn">NA</span>, <span class="at">color =</span> <span class="st">"grey20"</span>, <span class="at">stroke =</span> <span class="fl">0.5</span>) <span class="sc">+</span></span>
+<span id="cb32-8"><a href="#cb32-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_fill_brewer</span>(<span class="at">palette =</span> <span class="st">"..."</span>, <span class="at">name =</span> <span class="st">"..."</span>) <span class="sc">+</span></span>
+<span id="cb32-9"><a href="#cb32-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_size_area</span>(<span class="at">max_size =</span> <span class="dv">12</span>, <span class="at">name =</span> <span class="st">"Population"</span>,</span>
+<span id="cb32-10"><a href="#cb32-10" aria-hidden="true" tabindex="-1"></a>                  <span class="at">labels =</span> scales<span class="sc">::</span><span class="fu">label_number</span>(<span class="at">big.mark =</span> <span class="st">" "</span>)) <span class="sc">+</span></span>
+<span id="cb32-11"><a href="#cb32-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">title =</span> <span class="st">"..."</span>, <span class="at">subtitle =</span> <span class="st">"..."</span>, <span class="at">caption =</span> <span class="st">"..."</span>) <span class="sc">+</span></span>
+<span id="cb32-12"><a href="#cb32-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_void</span>()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<p><code>scale_size_area()</code> rend la <strong>surface</strong> des cercles proportionnelle à la population (et non leur rayon), ce qui est la règle en cartographie.</p>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>Pour aller plus loin : d’autres données INSEE
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Vous pouvez aussi télécharger une autre variable sur <a href="https://www.insee.fr">insee.fr</a> ou sur l’<a href="https://www.observatoire-des-territoires.gouv.fr">Observatoire des territoires</a>, par exemple le <strong>taux de pauvreté</strong>, le <strong>taux de chômage</strong> ou la <strong>part des 65 ans et plus</strong> par département. La jointure se fait de la même façon, avec le code du département : <code>left_join(nouvelle_table, by = c("CC_2" = "code_du_departement"))</code>.</p>
+</div>
+</div>
+<p>Les réponses ci-dessous portent sur l’<strong>exemple de la densité de population</strong> : servez-vous-en comme modèle pour votre propre variable.</p>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center collapsed" data-bs-toggle="collapse" data-bs-target=".callout-9-contents" aria-controls="callout-9" aria-expanded="false" aria-label="Toggle callout">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Exemple de réponse (densité) : questions 1 et 2
+</div>
+<div class="callout-btn-toggle d-inline-block border-0 py-1 ps-1 pe-0 float-end"><i class="callout-toggle"></i></div>
+</div>
+<div id="callout-9" class="callout-9-contents callout-collapse collapse">
+<div class="callout-body-container callout-body">
+<p>Les trois cartes sont celles des sections précédentes (intervalles égaux, quantiles, Fisher-Jenks). Exemples de justifications :</p>
+<ul>
+<li><strong>Intervalles égaux : peu adaptée.</strong> La distribution est très asymétrique : Paris (environ 20 000 hab/km²) étire l’étendue, si bien que presque tous les départements se retrouvent dans la première classe et la carte ne montre quasiment aucune différence en dehors de l’Île-de-France.</li>
+<li><strong>Quantiles : adaptée pour comparer les départements entre eux.</strong> Chaque classe contient environ 19 départements, ce qui fait bien apparaître le gradient entre départements urbains et ruraux (la « diagonale du vide »), mais la méthode masque l’ampleur des écarts : Paris (environ 20 000 hab/km²) est dans la même classe que des départements à environ 200 hab/km².</li>
+<li><strong>Fisher-Jenks : adaptée pour montrer les extrêmes, moins pour le reste.</strong> Elle suit les ruptures naturelles de la distribution et distingue bien les niveaux de densité en Île-de-France, mais 86 départements sur 96 restent dans la première classe : la carte ne montre presque aucune différence dans le reste de la France. C’est pourquoi, pour la carte finale, nous avons choisi nos propres bornes.</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center collapsed" data-bs-toggle="collapse" data-bs-target=".callout-10-contents" aria-controls="callout-10" aria-expanded="false" aria-label="Toggle callout">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Exemple de réponse (densité) : question 3
+</div>
+<div class="callout-btn-toggle d-inline-block border-0 py-1 ps-1 pe-0 float-end"><i class="callout-toggle"></i></div>
+</div>
+<div id="callout-10" class="callout-10-contents callout-collapse collapse">
+<div class="callout-body-container callout-body">
+<p>La densité est une variable <strong>quantitative ordonnée</strong> qui va de « faible » à « forte », sans valeur centrale significative. Il faut donc une <strong>palette séquentielle</strong> (du clair au foncé), par exemple <code>YlOrRd</code> ou <code>viridis</code> :</p>
+<ul>
+<li>une palette <strong>qualitative</strong> (couleurs sans ordre, comme pour les régions) ne traduirait pas l’ordre des valeurs ;</li>
+<li>une palette <strong>divergente</strong> (deux couleurs opposées autour d’un centre) suppose une valeur de référence au milieu (par exemple la moyenne nationale), ce qui n’est pas le cas ici ;</li>
+<li><code>viridis</code> a l’avantage d’être lisible par les personnes daltoniennes et de rester lisible en noir et blanc.</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center collapsed" data-bs-toggle="collapse" data-bs-target=".callout-11-contents" aria-controls="callout-11" aria-expanded="false" aria-label="Toggle callout">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Exemple de réponse (densité) : question 4
+</div>
+<div class="callout-btn-toggle d-inline-block border-0 py-1 ps-1 pe-0 float-end"><i class="callout-toggle"></i></div>
+</div>
+<div id="callout-11" class="callout-11-contents callout-collapse collapse">
+<div class="callout-body-container callout-body">
+<p>Voir la section <strong>« Une carte finale avec des bornes choisies à la main »</strong> ci-dessus : titre, sous-titre, légende avec unité, source, flèche du nord, échelle, et un encart pour la zone trop petite pour être lisible.</p>
+</div>
+</div>
+</div>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center collapsed" data-bs-toggle="collapse" data-bs-target=".callout-12-contents" aria-controls="callout-12" aria-expanded="false" aria-label="Toggle callout">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Réponse : bonus 2
+</div>
+<div class="callout-btn-toggle d-inline-block border-0 py-1 ps-1 pe-0 float-end"><i class="callout-toggle"></i></div>
+</div>
+<div id="callout-12" class="callout-12-contents callout-collapse collapse">
+<div class="callout-body-container callout-body">
+<p>La population est une variable de <strong>stock</strong> (un effectif) : elle dépend de la taille du département. En aplats de couleur, un grand département peu dense paraîtrait aussi « important » qu’un petit département très peuplé. Un <strong>cercle proportionnel</strong> représente directement la quantité, indépendamment de la surface. La règle : <strong>les ratios en couleur, les effectifs en symboles</strong>.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb33"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb33-1"><a href="#cb33-1" aria-hidden="true" tabindex="-1"></a>dep_points <span class="ot">&lt;-</span> <span class="fu">st_point_on_surface</span>(dep)</span>
+<span id="cb33-2"><a href="#cb33-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb33-3"><a href="#cb33-3" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>() <span class="sc">+</span></span>
+<span id="cb33-4"><a href="#cb33-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_sf</span>(<span class="at">data =</span> dep, <span class="fu">aes</span>(<span class="at">fill =</span> classe), <span class="at">color =</span> <span class="st">"white"</span>, <span class="at">linewidth =</span> <span class="fl">0.15</span>) <span class="sc">+</span></span>
+<span id="cb33-5"><a href="#cb33-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_sf</span>(<span class="at">data =</span> dep_points, <span class="fu">aes</span>(<span class="at">size =</span> PMUN),</span>
+<span id="cb33-6"><a href="#cb33-6" aria-hidden="true" tabindex="-1"></a>          <span class="at">shape =</span> <span class="dv">21</span>, <span class="at">fill =</span> <span class="cn">NA</span>, <span class="at">color =</span> <span class="st">"grey20"</span>, <span class="at">stroke =</span> <span class="fl">0.5</span>) <span class="sc">+</span></span>
+<span id="cb33-7"><a href="#cb33-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_fill_manual</span>(<span class="at">values =</span> pal, <span class="at">name =</span> <span class="st">"Habitants / km²"</span>, <span class="at">drop =</span> <span class="cn">FALSE</span>) <span class="sc">+</span></span>
+<span id="cb33-8"><a href="#cb33-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_size_area</span>(<span class="at">max_size =</span> <span class="dv">12</span>, <span class="at">name =</span> <span class="st">"Population"</span>,</span>
+<span id="cb33-9"><a href="#cb33-9" aria-hidden="true" tabindex="-1"></a>                  <span class="at">breaks =</span> <span class="fu">c</span>(<span class="dv">250000</span>, <span class="dv">1000000</span>, <span class="dv">2500000</span>),</span>
+<span id="cb33-10"><a href="#cb33-10" aria-hidden="true" tabindex="-1"></a>                  <span class="at">labels =</span> scales<span class="sc">::</span><span class="fu">label_number</span>(<span class="at">big.mark =</span> <span class="st">" "</span>)) <span class="sc">+</span></span>
+<span id="cb33-11"><a href="#cb33-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(</span>
+<span id="cb33-12"><a href="#cb33-12" aria-hidden="true" tabindex="-1"></a>    <span class="at">title    =</span> <span class="st">"Densité et population en France métropolitaine"</span>,</span>
+<span id="cb33-13"><a href="#cb33-13" aria-hidden="true" tabindex="-1"></a>    <span class="at">subtitle =</span> <span class="st">"Par département, 2022"</span>,</span>
+<span id="cb33-14"><a href="#cb33-14" aria-hidden="true" tabindex="-1"></a>    <span class="at">caption  =</span> <span class="st">"Source : INSEE, populations légales 2022 ; GADM v4.1"</span></span>
+<span id="cb33-15"><a href="#cb33-15" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
+<span id="cb33-16"><a href="#cb33-16" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_void</span>() <span class="sc">+</span></span>
+<span id="cb33-17"><a href="#cb33-17" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme</span>(<span class="at">plot.title =</span> <span class="fu">element_text</span>(<span class="at">face =</span> <span class="st">"bold"</span>, <span class="at">size =</span> <span class="dv">16</span>))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="choropleths_France_files/figure-html/bonus-symboles-1.png" class="img-fluid figure-img" width="768"></p>
+</figure>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+</section>
+<section id="pour-aller-plus-loin" class="level2">
+<h2 class="anchored" data-anchor-id="pour-aller-plus-loin">Pour aller plus loin</h2>
+<ul>
+<li><p>Sur la réalisation de belles cartes avec <code>sf</code> et <code>ggplot2</code>, voir <a href="https://r-spatial.org/r/2018/10/25/ggplot2-sf.html">ici</a>.</p></li>
+<li><p>Pour les cartes choroplèthes en <strong>Python</strong>, voir le chapitre de <a href="https://geographicdata.science/book/notebooks/05_choropleth.html">Rey, Arribas-Bel et Wolf</a>.</p></li>
+<li><p>Le package <a href="https://riatelab.github.io/mapsf/"><code>mapsf</code></a> (RIATE) propose une approche alternative à <code>ggplot2</code>, très utilisée en cartographie thématique en France.</p></li>
+</ul>
+
+
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/pietrostefani\.github\.io\/rcarto");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+<nav class="page-navigation">
+  <div class="nav-page nav-page-previous">
+      <a href="./interpolation.html" class="pagination-link" aria-label="Lissage et Interpolation Spatiale">
+        <i class="bi bi-arrow-left-short"></i> <span class="nav-page-text"><span class="chapter-number">9</span>&nbsp; <span class="chapter-title">Lissage et Interpolation Spatiale</span></span>
+      </a>          
+  </div>
+  <div class="nav-page nav-page-next">
+      <a href="./geoprocessing_Paris.html" class="pagination-link" aria-label="Géotraitement : Paris">
+        <span class="nav-page-text"><span class="chapter-number">10</span>&nbsp; <span class="chapter-title">Géotraitement : Paris</span></span> <i class="bi bi-arrow-right-short"></i>
+      </a>
+  </div>
+</nav>
+</div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+    <div class="nav-footer-left">
+<p>RCarto par Dr.&nbsp;Elisabetta Pietrostefani.</p>
+</div>   
+    <div class="nav-footer-center">
+      &nbsp;
+    <div class="toc-actions d-sm-block d-md-none"><ul><li><a href="https://github.com/pietrostefani/rcarto/edit/main/choropleths_France.qmd" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li></ul></div></div>
+    <div class="nav-footer-right">
+<p>Ce livre a été construit avec <a href="https://quarto.org/">Quarto</a>.</p>
+</div>
+  </div>
+</footer>
+
+
+
+
+</body></html>
