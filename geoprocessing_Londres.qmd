@@ -12,7 +12,6 @@ format:
     code-tools: true
     theme: cosmo
     highlight-style: github
-    embed-resources: true
     fig-align: center
     fig-width: 8
     fig-height: 6
@@ -647,14 +646,14 @@ plot(W_dist_mat,
 
 ## Liens utiles {#sec-links}
 
--   [Geocomputation with R — Ch. 4 : Spatial data operations](https://geocompr.robinlovelace.net/spatial-operations.html)
--   [sf cheatsheet](https://github.com/rstudio/cheatsheets/blob/main/sf.pdf)
--   [ggplot2 themes](https://ggplot2.tidyverse.org/reference/ggtheme.html)
--   [Spatial intersection / join comparison](https://tmieno2.github.io/R-as-GIS-for-Economists/spatial-intersection-cropping-join.html)
+- [Geocomputation with R — Ch. 4 : Spatial data operations](https://geocompr.robinlovelace.net/spatial-operations.html)
+- [sf cheatsheet](https://github.com/rstudio/cheatsheets/blob/main/sf.pdf)
+- [ggplot2 themes](https://ggplot2.tidyverse.org/reference/ggtheme.html)
+- [Spatial intersection / join comparison](https://tmieno2.github.io/R-as-GIS-for-Economists/spatial-intersection-cropping-join.html)
 
 ------------------------------------------------------------------------
 
-> **← Précédent : [Choroplèthes et Classification](choropleths.qmd)** **→ Suivant : Calculs d'Indices Topographiques**
+> **← Précédent : [Relief du Liban](raster_Liban.qmd)** **→ Suivant : [Interpolation Spatiale](interpolation.qmd)**
 
 ------------------------------------------------------------------------
 

@@ -1,0 +1,716 @@
+---
+title: "Raster : relief"
+author: "Dr. Elisabetta Pietrostefani"
+date: today
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    toc-title: "Table des matières"
+    number-sections: true
+    code-fold: show
+    code-tools: true
+    theme: cosmo
+    highlight-style: github
+    fig-align: center
+    fig-width: 8
+    fig-height: 6
+execute:
+  warning: false
+  message: false
+  echo: true
+---
+
+## Introduction {#sec-intro}
+
+Jusqu'ici, nous avons travaillé avec des données **vectorielles** : des points, des lignes et des polygones, chacun avec une géométrie et une ligne dans un tableau. Les données **raster** fonctionnent autrement : c'est une grille régulière de cellules (ou pixels), chacune portant **une seule valeur**, sans tableau d'attributs.
+
+Cette différence compte plus qu'il n'y paraît. Un raster ne connaît ni les « communes » ni les « ménages » : il sait seulement que la cellule (1450, 2013) vaut 847. Une grande partie du travail sur les rasters consiste donc à faire le pont entre *une grille de nombres* et *les données sociales et administratives* qui nous intéressent.
+
+Dans ce chapitre, on découvre chaque opération pas à pas sur le **Liban**, un territoire au relief contrasté : une côte méditerranéenne et deux chaînes de montagnes qui dépassent 3 000 m. À la fin, vous reproduirez la démarche sur la **Corse** en exercice (@sec-exercise).
+
+::: callout-tip
+## Ce que vous saurez faire à la fin
+
+| Opération                          | Fonction            |
+|------------------------------------|---------------------|
+| Charger et explorer un raster      | `rast()`            |
+| Reprojeter                         | `project()`         |
+| Recadrer et masquer                | `crop()` + `mask()` |
+| Calculer la pente                  | `terrain()`         |
+| Reclassifier                       | `classify()`        |
+| Extraire des valeurs en des points | `extract()`         |
+| Calculer des statistiques par zone | `exact_extract()`   |
+:::
+
+```{r}
+#| label: setup
+
+library(terra)          # manipulation des rasters
+library(tidyterra)      # geom_spatraster() et palettes pour ggplot2
+library(sf)             # données vectorielles
+library(ggplot2)        # visualisation
+library(dplyr)          # manipulation de données
+library(exactextractr)  # statistiques zonales
+
+terraOptions(progress = 0)   # masquer les barres de progression de terra
+```
+
+::: {.callout-note collapse="true"}
+## Installer les packages si nécessaire
+
+```{r}
+#| eval: false
+install.packages(c("terra", "tidyterra", "exactextractr"))
+```
+
+`terra` remplace l'ancien package `raster` (déprécié depuis 2023). Si vous trouvez du code en ligne qui utilise `raster`, les fonctions se traduisent assez directement : `raster()` → `rast()`, `extent()` → `ext()`. `tidyterra` permet d'utiliser les rasters dans `ggplot2` avec `geom_spatraster()`.
+:::
+
+------------------------------------------------------------------------
+
+## Charger et explorer le MNT {#sec-lb-load}
+
+Un **MNT** (*Modèle Numérique de Terrain*) est un raster dont chaque cellule contient une altitude.
+
+```{r}
+#| label: lb-load
+
+dem_lb <- rast("data/Liban/LBN_elevation_w_bathymetry.tif")
+dem_lb
+```
+
+Prenez le temps de lire cet affichage. Contrairement à un objet `sf`, il n'y a pas de lignes de tableau, mais :
+
+- les **dimensions** : le nombre de lignes et de colonnes de cellules ;
+- la **résolution** : la taille d'une cellule (ici 0,0025 degré, soit environ 250 m) ;
+- l'**emprise** (*extent*) : le rectangle couvert ;
+- le **système de coordonnées** (SCR) : ici WGS 84, en degrés.
+
+C'est l'anatomie de tous les rasters que vous rencontrerez.
+
+```{r}
+#| label: lb-plot-raw
+plot(dem_lb)
+```
+
+Remarquez les valeurs négatives : ce fichier contient aussi la **bathymétrie** (la profondeur sous le niveau de la mer), c'est pourquoi la Méditerranée apparaît.
+
+## Le contour du pays et son SCR {#sec-lb-vector}
+
+```{r}
+#| label: lb-vector
+
+liban <- read_sf("data/Liban/LBN_adm1.shp")   # les gouvernorats (mohafazat)
+
+st_crs(liban)$input
+crs(dem_lb, describe = TRUE)$name
+```
+
+Les deux SCR sont différents : le raster est en degrés (WGS 84), le vecteur en mètres (Lambert syrien, EPSG:22770). Il faut les aligner avant toute opération.
+
+## Reprojeter le raster {#sec-lb-project}
+
+On reprojette le raster dans le SCR du vecteur. Avantage : ce SCR est en **mètres**, ce qui nous servira pour calculer la pente.
+
+```{r}
+#| label: lb-project
+
+dem_lb <- project(dem_lb, crs(vect(liban)))
+crs(dem_lb, describe = TRUE)$name
+res(dem_lb)   # résolution, désormais en mètres
+```
+
+::: callout-important
+## Reprojeter un raster n'est pas anodin
+
+Reprojeter un **vecteur** déplace simplement des coordonnées. Reprojeter un **raster** oblige à construire une nouvelle grille et à *estimer* la valeur de chaque nouvelle cellule (par interpolation) : les données changent légèrement. Reprojetez une seule fois, le plus tôt possible.
+:::
+
+`vect()` convertit un objet `sf` en objet vecteur de `terra` (`SpatVector`), le format attendu par les fonctions de `terra`.
+
+## Recadrer et masquer {#sec-lb-crop}
+
+Deux opérations pour se limiter à la zone d'étude :
+
+- `crop()` **recadre** sur l'emprise rectangulaire du vecteur : le raster devient plus petit ;
+- `mask()` **masque** tout ce qui est en dehors du contour exact : les cellules extérieures deviennent `NA`.
+
+```{r}
+#| label: lb-crop
+
+dem_lb_crop <- crop(dem_lb, vect(liban))
+dem_lb      <- mask(dem_lb_crop, vect(liban))
+```
+
+```{r}
+#| label: lb-crop-vs-mask
+#| fig-height: 5
+
+par(mfrow = c(1, 2))
+plot(dem_lb_crop, main = "Recadré (crop)")
+plot(dem_lb,      main = "Recadré + masqué (mask)")
+par(mfrow = c(1, 1))
+```
+
+::: callout-tip
+## Pourquoi dans cet ordre ?
+
+`crop()` est une opération rapide (un simple rectangle) ; `mask()` doit tester chaque cellule contre le contour du polygone. **On recadre d'abord, on masque ensuite** : on réduit le problème avant l'étape coûteuse. Sur un grand raster, cela peut faire passer le calcul de plusieurs minutes à quelques secondes.
+:::
+
+## Cartographier le relief {#sec-lb-map}
+
+`tidyterra` fournit `geom_spatraster()`, qui fait entrer un raster dans la grammaire de `ggplot2` que vous connaissez déjà.
+
+```{r}
+#| label: lb-map
+
+ggplot() +
+  geom_spatraster(data = dem_lb) +
+  geom_sf(data = liban, fill = NA, colour = "grey20", linewidth = 0.4) +
+  scale_fill_hypso_c(palette = "dem_poster", na.value = NA,
+                     name = "Altitude (m)") +
+  labs(title    = "Relief du Liban",
+       subtitle = "Modèle numérique de terrain, gouvernorats en surimpression",
+       caption  = "Source : SRTM ; GADM") +
+  theme_void(base_size = 12) +
+  theme(plot.title = element_text(face = "bold"))
+```
+
+`scale_fill_hypso_c()` utilise une palette **hypsométrique** : du vert (plaines) au brun puis au blanc (sommets), la convention des atlas physiques. C'est bien plus lisible pour le relief qu'une palette séquentielle générique.
+
+## Calculer la pente {#sec-lb-slope}
+
+La pente mesure l'inclinaison du terrain, en degrés. `terrain()` la calcule à partir des altitudes des cellules voisines.
+
+```{r}
+#| label: lb-slope
+
+pente_lb <- terrain(dem_lb, v = "slope", unit = "degrees")
+
+global(pente_lb, c("mean", "max"), na.rm = TRUE)
+```
+
+::: callout-important
+## Un SCR en mètres est indispensable
+
+La pente compare une différence d'**altitude** (en mètres) à une distance **horizontale**. Si l'horizontale est en degrés, les deux unités sont incompatibles et la pente est fausse. C'est pourquoi on a reprojeté le MNT en mètres à l'étape précédente.
+:::
+
+```{r}
+#| label: lb-slope-map
+
+ggplot() +
+  geom_spatraster(data = pente_lb) +
+  geom_sf(data = liban, fill = NA, colour = "white", linewidth = 0.4) +
+  scale_fill_viridis_c(option = "magma", na.value = NA, name = "Pente (°)") +
+  labs(title = "Pente du terrain — Liban",
+       caption = "Source : SRTM ; GADM") +
+  theme_void(base_size = 12) +
+  theme(plot.title = element_text(face = "bold"))
+```
+
+Les deux chaînes de montagnes (Mont-Liban à l'ouest, Anti-Liban à l'est) ressortent nettement, séparées par la plaine de la Bekaa.
+
+## Reclassifier en zones d'altitude {#sec-lb-reclass}
+
+La reclassification transforme un raster **continu** en **catégories**, selon des seuils. On utilise une matrice à trois colonnes : *de*, *à*, *nouvelle valeur*. On définit 4 zones, que l'on réutilisera telles quelles pour la Corse afin de pouvoir comparer.
+
+```{r}
+#| label: lb-reclass
+
+rcl <- matrix(c(
+  -Inf,  200, 1,   # Littoral
+   200,  800, 2,   # Basse montagne
+   800, 1500, 3,   # Montagne
+  1500,  Inf, 4    # Haute montagne
+), ncol = 3, byrow = TRUE)
+
+zones_lb <- classify(dem_lb, rcl)
+
+# Noms des zones, utilisés pour la légende et les tableaux
+noms_zones <- c("1" = "Littoral (< 200 m)",
+                "2" = "Basse montagne (200–800 m)",
+                "3" = "Montagne (800–1 500 m)",
+                "4" = "Haute montagne (> 1 500 m)")
+couleurs_zones <- c("1" = "#74add1", "2" = "#fee090",
+                    "3" = "#fc8d59", "4" = "#d73027")
+
+# Part de chaque zone (en % des cellules)
+freq(zones_lb) |>
+  mutate(zone = noms_zones[as.character(value)],
+         part = round(count / sum(count) * 100, 1)) |>
+  select(zone, part)
+```
+
+```{r}
+#| label: lb-reclass-map
+
+ggplot() +
+  geom_spatraster(data = as.factor(zones_lb)) +
+  scale_fill_manual(values = couleurs_zones, labels = noms_zones,
+                    na.value = NA, na.translate = FALSE,
+                    name = "Zone d'altitude") +
+  labs(title = "Zones d'altitude — Liban") +
+  theme_void(base_size = 12) +
+  theme(plot.title = element_text(face = "bold"))
+```
+
+## Du raster au vecteur (1) : extraire des valeurs en des points {#sec-lb-extract}
+
+Voici le pont entre les deux modèles de données. On dispose d'un raster d'altitude et d'un ensemble de **points** : 2 000 ménages enquêtés (localisations fictives). On veut que chaque ménage connaisse son altitude.
+
+```{r}
+#| label: lb-extract
+
+menages <- read_sf("data/Liban/random_survey_LBN.shp")
+st_crs(menages)$input                         # WGS 84 : pas le même SCR que le raster !
+
+menages <- st_transform(menages, crs(dem_lb)) # on aligne les SCR
+
+# extract() lit la valeur du raster à chaque point
+alt <- terra::extract(dem_lb, vect(menages))
+menages$altitude <- alt[[2]]                  # 1re colonne = ID, 2e = valeur
+
+summary(menages$altitude)
+```
+
+::: callout-important
+## Une colonne remplie de `NA` ?
+
+C'est presque toujours un problème de **SCR** : les points et le raster ne sont pas dans le même système. Vérifiez avec `crs(dem_lb)` et `st_crs(menages)`, et reprojetez avant d'extraire. Ici, quelques `NA` sont normaux : ce sont des points situés juste en dehors du masque (en mer ou hors frontière).
+:::
+
+À partir de là, l'altitude est un attribut comme un autre : on peut la résumer, la modéliser, ou la cartographier.
+
+```{r}
+#| label: lb-extract-map
+
+ggplot() +
+  geom_sf(data = liban, fill = "grey95", colour = "grey60") +
+  geom_sf(data = filter(menages, !is.na(altitude)),
+          aes(colour = altitude), size = 0.8) +
+  scale_colour_hypso_c(palette = "dem_poster", name = "Altitude (m)") +
+  labs(title = "Altitude des ménages enquêtés") +
+  theme_void(base_size = 12) +
+  theme(plot.title = element_text(face = "bold"))
+```
+
+## Du raster au vecteur (2) : statistiques zonales {#sec-lb-zonal}
+
+Les **statistiques zonales** résument toutes les cellules situées dans chaque polygone : on obtient **une valeur par zone administrative**, que l'on peut joindre et cartographier comme n'importe quelle variable. C'est le lien direct avec les cartes choroplèthes.
+
+`exact_extract()` est rapide et tient compte des cellules qui ne sont que **partiellement** dans un polygone, en les pondérant par la fraction couverte.
+
+```{r}
+#| label: lb-zonal
+
+liban$alt_moy   <- exact_extract(dem_lb,   liban, "mean", progress = FALSE)
+liban$pente_moy <- exact_extract(pente_lb, liban, "mean", progress = FALSE)
+
+liban |>
+  st_drop_geometry() |>
+  select(NAME_1, alt_moy, pente_moy) |>
+  arrange(desc(alt_moy))
+```
+
+```{r}
+#| label: lb-zonal-map
+
+ggplot(liban) +
+  geom_sf(aes(fill = alt_moy), colour = "white", linewidth = 0.4) +
+  scale_fill_distiller(palette = "YlOrBr", direction = 1,
+                       name = "Altitude\nmoyenne (m)") +
+  labs(title    = "Altitude moyenne par gouvernorat — Liban",
+       subtitle = "Statistiques zonales à partir du MNT",
+       caption  = "Source : SRTM ; GADM") +
+  theme_void(base_size = 12) +
+  theme(plot.title = element_text(face = "bold"))
+```
+
+La partie raster est terminée : le résultat est un objet `sf` ordinaire, avec une colonne numérique. C'est désormais une **carte choroplèthe** comme celles des séances précédentes.
+
+------------------------------------------------------------------------
+
+## À vous de jouer — Exercice Corse {#sec-exercise}
+
+La Corse présente un relief comparable au Liban : une côte méditerranéenne et un massif montagneux qui culmine au Monte Cinto (2 706 m). Reproduisez la démarche de ce chapitre, puis comparez les deux territoires.
+
+**Fichiers disponibles :**
+
+| Fichier | Description |
+|------------------------------------|------------------------------------|
+| `data/France/Corse/Corse_tout_lambert.tif` | MNT de la Corse, en Lambert 93 (mètres) |
+| `data/France/gadm41_FRA_shp/gadm41_FRA_5.shp` | Communes de France (GADM, niveau 5) |
+
+### Exercice 1 — Charger et explorer le MNT
+
+Chargez le MNT de la Corse. Quel est son SCR ? Sa résolution ? Combien de cellules contient-il ? Comparez avec le Liban.
+
+### Exercice 2 — Harmoniser la résolution
+
+Pour comparer les deux territoires, il faut travailler **à la même résolution** : une pente calculée sur des cellules de 27 m n'est pas comparable à une pente calculée sur des cellules de 250 m (plus les cellules sont fines, plus on capte de pentes fortes). Utilisez `aggregate()` pour ramener le MNT corse à une résolution proche de celle du Liban.
+
+::: callout-note
+## Et si le MNT était découpé en tuiles ?
+
+Les MNT à haute résolution sont souvent distribués en **tuiles** (`DEM_corse_1.tif` à `DEM_corse_4.tif` dans le dossier). On les assemble avec `mosaic(t1, t2, t3, t4, fun = "mean")` : la fonction `"mean"` s'applique aux cellules qui se chevauchent sur les bords.
+:::
+
+### Exercice 3 — Recadrer et masquer
+
+Chargez les communes de France, gardez celles de la Corse (`NAME_1 == "Corse"`), mettez-les dans le SCR du MNT, puis recadrez et masquez le MNT.
+
+### Exercice 4 — Cartographier le relief
+
+Réalisez une carte hypsométrique du MNT corse, avec un titre et une source.
+
+### Exercice 5 — Calculer la pente
+
+Calculez la pente en degrés, puis sa moyenne et son maximum. Pourquoi peut-on la calculer directement sur ce MNT ?
+
+### Exercice 6 — Reclassifier en zones d'altitude
+
+Reclassifiez le MNT avec **la même matrice** `rcl` que pour le Liban, puis calculez la part de chaque zone.
+
+### Exercice 7 — Statistiques zonales par commune
+
+Calculez l'altitude moyenne de chaque commune corse avec `exact_extract()`, puis cartographiez-la. Quelles sont les communes les plus hautes ?
+
+### Exercice 8 — Comparer le Liban et la Corse
+
+Les deux MNT sont maintenant à une résolution comparable, dans des SCR en mètres et reclassifiés avec les mêmes seuils. Construisez un tableau de synthèse (altitude moyenne et maximale, pente moyenne, surface) et un graphique comparant la part de chaque zone d'altitude dans les deux territoires.
+
+- Lequel des deux territoires est le plus **montagneux** ? Le plus **escarpé** ? Est-ce la même chose ?
+- Que se passerait-il si l'on comparait la pente du Liban (cellules de 250 m) à celle de la Corse **sans** agréger le MNT corse (cellules de 27 m) ?
+
+**→ Corrigé : [Raster : Corse](raster_Corse.qmd)**
+
+------------------------------------------------------------------------
+
+## Récapitulatif {#sec-summary}
+
+::: callout-note
+## Les opérations raster essentielles
+
+``` r
+# 1. Charger et explorer
+dem <- rast("fichier.tif")
+
+# 2. Reprojeter (une seule fois, le plus tôt possible)
+dem <- project(dem, crs(vect(vecteur)))
+
+# 3. Recadrer puis masquer
+dem <- crop(dem, vect(vecteur)) |> mask(vect(vecteur))
+
+# 4. Harmoniser la résolution
+dem <- aggregate(dem, fact = 9, fun = "mean")
+
+# 5. Pente (SCR en mètres obligatoire)
+pente <- terrain(dem, v = "slope", unit = "degrees")
+
+# 6. Reclassifier
+zones <- classify(dem, matrix(c(-Inf, 200, 1, 200, Inf, 2), ncol = 3, byrow = TRUE))
+
+# 7. Du raster au vecteur
+points$alt <- terra::extract(dem, vect(points))[[2]]           # en des points
+polygones$alt_moy <- exact_extract(dem, polygones, "mean")     # par zone
+```
+:::
+
+------------------------------------------------------------------------
+
+## Obtenir des données d'altitude {#sec-dem-sources}
+
+Trois grandes familles de sources couvrent les besoins selon l'étendue géographique et la résolution souhaitée : les données globales de la NASA (SRTM, ASTER GDEM, NASADEM), les données françaises de haute précision de l'IGN (RGE ALTI®), et les tuiles accessibles directement depuis R via le package `elevatr`.
+
+### Comparaison des principales sources
+
+| Source | Résolution | Couverture | Accès | Usage typique |
+|---------------|---------------|---------------|---------------|---------------|
+| **SRTM** (NASA) | \~30 m (1 arc-sec) | Mondial (60°N–56°S) | Libre | Analyse topographique générale |
+| **ASTER GDEM v3** | \~30 m | Mondial (83°N–83°S) | Libre | Zones hors couverture SRTM |
+| **NASADEM** | \~30 m | Mondial (60°N–56°S) | Libre | SRTM retraité, moins de vides |
+| **RGE ALTI® IGN** | **1 m** | France entière | Libre | Analyses fines, zones inondables |
+| **NextGIS / SRTM France** | \~30 m | France | Libre | Téléchargement rapide, prêt à l'emploi |
+| **AWS Terrain Tiles** | Variable (zoom 1–14) | Mondial | Via `elevatr` | Import direct dans R sans compte |
+
+------------------------------------------------------------------------
+
+### Option 1 — NASA Earthdata : SRTM, ASTER GDEM, NASADEM
+
+La NASA distribue plusieurs MNT mondiaux librement accessibles après création d'un compte gratuit sur [Earthdata](https://www.earthdata.nasa.gov/topics/land-surface/digital-elevation-terrain-model-dem).
+
+::: callout-note
+## Les trois produits NASA à connaître
+
+**SRTM** (*Shuttle Radar Topography Mission*, 2000) — collecté en 11 jours par la navette spatiale Endeavour, il couvre 80 % de la surface terrestre à \~30 m de résolution. C'est la référence mondiale pour la plupart des analyses topographiques.
+
+**ASTER GDEM v3** — produit à partir de plus d'un million d'images stéréoscopiques du satellite Terra (NASA/METI), il couvre 99 % de la surface terrestre jusqu'à 83° de latitude. Résolution nominale de 30 m, mais précision réelle légèrement inférieure au SRTM dans les zones nuageuses.
+
+**NASADEM** — retraitement amélioré du SRTM intégrant des données ASTER GDEM, ICESat et ALOS pour combler les vides et améliorer la précision verticale. À privilégier par rapport au SRTM brut pour les nouvelles analyses.
+:::
+
+Les données sont distribuées en tuiles de 1° × 1° au format GeoTIFF. Une fois téléchargées, on les charge et assemble directement avec `terra` :
+
+```{r}
+#| label: nasa-dem-load
+#| eval: false
+
+library(terra)
+library(tidyterra)
+library(ggplot2)
+
+# Après téléchargement manuel depuis https://earthdata.nasa.gov
+# Les fichiers SRTM ont la convention de nommage : N48E002.SRTMGL1.hgt.zip
+# Les fichiers NASADEM : NASADEM_HGT_n48e002.zip
+
+# Charger une tuile SRTM décompressée
+srtm_tuile <- rast("data/DEM/N48E002.hgt")
+
+cat("Résolution :", res(srtm_tuile), "degrés (~30 m)\n")
+cat("Étendue    :", as.character(ext(srtm_tuile)), "\n")
+
+# Assembler plusieurs tuiles avec mosaic()
+# (nécessaire si la zone d'intérêt couvre plusieurs tuiles)
+t1 <- rast("data/DEM/N48E001.hgt")
+t2 <- rast("data/DEM/N48E002.hgt")
+t3 <- rast("data/DEM/N49E001.hgt")
+t4 <- rast("data/DEM/N49E002.hgt")
+
+dem_mosaic <- mosaic(t1, t2, t3, t4, fun = "mean")
+
+ggplot() +
+  geom_spatraster(data = dem_mosaic) +
+  scale_fill_gradientn(colors   = hcl.colors(50, "Terrain"),
+                        name     = "Altitude (m)",
+                        na.value = "transparent") +
+  labs(title   = "MNT SRTM assemblé",
+       caption = "Source : NASA SRTM | Earthdata") +
+  theme_void(base_size = 12) +
+  theme(plot.title = element_text(face = "bold", hjust = 0.5))
+```
+
+------------------------------------------------------------------------
+
+### Option 2 — RGE ALTI® : le MNT 1 m de l'IGN pour la France
+
+Pour les analyses sur la France, le [RGE ALTI®](https://geoservices.ign.fr/rgealti) de l'IGN est la source de référence. Il décrit l'altitude de la surface du sol à **1 mètre de résolution** sur l'ensemble du territoire métropolitain et des DOM-TOM, avec une précision verticale de 20 cm dans les zones inondables et littorales.
+
+::: callout-tip
+## Comment télécharger le RGE ALTI®
+
+1.  Rendez-vous sur [geoservices.ign.fr/rgealti](https://geoservices.ign.fr/rgealti)
+2.  Créez un compte gratuit sur le Géoportail de l'IGN
+3.  Sélectionnez le département ou la région souhaités
+4.  Choisissez le format **GeoTIFF** et la résolution **1 m** ou **5 m**
+5.  Les fichiers sont distribués par dalles (tuiles) — utilisez `mosaic()` pour les assembler
+
+Le RGE ALTI® à 1 m est aussi accessible via l'[API flux WCS de l'IGN](https://geoservices.ign.fr/documentation/services/api-et-services-ogc/images-wcs) pour une extraction directe par emprise.
+:::
+
+```{r}
+#| label: rgealti-load
+#| eval: false
+
+# Après téléchargement depuis geoservices.ign.fr/rgealti
+# Structure typique des fichiers IGN :
+#   RGEALTI_2-0_1M_ASC_LAMB93-IGN69_D075_2021-01-01/
+#     RGEALTI_FXX_0630_6860_MNT_LAMB93_IGN69.asc   ← tuiles ASCII Grid
+#   ou format GeoTIFF selon la version téléchargée
+
+# Charger une tuile GeoTIFF
+ign_tuile <- rast("data/IGN/RGEALTI_FXX_0630_6860_MNT_LAMB93_IGN69.tif")
+
+cat("SCR        :", crs(ign_tuile, describe = TRUE)$name, "\n")  # Lambert-93
+cat("Résolution :", res(ign_tuile), "mètres\n")                   # 1 m × 1 m
+cat("Min / Max  :", global(ign_tuile, "range", na.rm = TRUE)[[1]], "m\n")
+
+# Le RGE ALTI® est déjà en Lambert-93 (EPSG:2154) — aucune reprojection nécessaire
+# pour les analyses sur la France
+
+# Si les fichiers sont au format ASCII Grid (.asc), terra les lit de la même façon
+ign_asc <- rast("data/IGN/RGEALTI_FXX_0630_6860_MNT_LAMB93_IGN69.asc")
+
+# Assembler plusieurs dalles
+dalles <- list.files("data/IGN/", pattern = "\\.tif$", full.names = TRUE)
+dem_ign <- do.call(mosaic, c(lapply(dalles, rast), list(fun = "mean")))
+
+ggplot() +
+  geom_spatraster(data = dem_ign) +
+  scale_fill_gradientn(colors   = hcl.colors(50, "Terrain"),
+                        name     = "Altitude (m)",
+                        na.value = "transparent") +
+  labs(title   = "RGE ALTI® IGN — résolution 1 m",
+       caption = "Source : IGN — RGE ALTI® | geoservices.ign.fr") +
+  theme_void(base_size = 12) +
+  theme(plot.title = element_text(face = "bold", hjust = 0.5))
+```
+
+------------------------------------------------------------------------
+
+### Option 3 — NextGIS : SRTM France prêt à l'emploi
+
+[NextGIS](https://data.nextgis.com/en/region/FR/dem/) propose des MNT SRTM préconfigurés par pays, directement téléchargeables au format GeoTIFF sans création de compte. C'est l'option la plus rapide pour obtenir un MNT de la France entière à \~30 m de résolution.
+
+```{r}
+#| label: nextgis-load
+#| eval: false
+
+# Après téléchargement depuis https://data.nextgis.com/en/region/FR/dem/
+# Le fichier est un GeoTIFF unique couvrant toute la France
+
+dem_france <- rast("data/nextgis/dem.tif")
+
+cat("SCR        :", crs(dem_france, describe = TRUE)$name, "\n")
+cat("Résolution :", res(dem_france), "\n")
+cat("Min / Max  :", global(dem_france, "min", na.rm = TRUE)[[1]], "/",
+                    global(dem_france, "max", na.rm = TRUE)[[1]], "m\n")
+
+# Reprojeter en Lambert-93 pour les analyses sur la France
+dem_france_l93 <- project(dem_france, "EPSG:2154")
+
+ggplot() +
+  geom_spatraster(data = dem_france_l93) +
+  scale_fill_gradientn(colors   = hcl.colors(50, "Terrain"),
+                        name     = "Altitude (m)",
+                        na.value = "transparent") +
+  labs(title   = "MNT France — SRTM via NextGIS",
+       caption = "Source : NextGIS / SRTM | data.nextgis.com") +
+  theme_void(base_size = 12) +
+  theme(plot.title = element_text(face = "bold", hjust = 0.5))
+```
+
+------------------------------------------------------------------------
+
+### Option 4 — `elevatr` : import direct depuis R sans téléchargement manuel
+
+Le package `elevatr` permet de récupérer des données d'altitude directement depuis R, sans passer par un navigateur. Il interroge les tuiles AWS Terrain (synthèse SRTM/3DEP/GMTED2010) ou l'API OpenTopography, et renvoie un objet `terra` prêt à l'emploi.
+
+```{r}
+#| label: elevatr-install
+#| eval: false
+
+install.packages("elevatr")
+```
+
+```{r}
+#| label: elevatr-demo
+#| eval: false
+
+library(elevatr)
+library(sf)
+library(terra)
+library(tidyterra)
+library(ggplot2)
+library(rnaturalearth)
+
+# elevatr accepte un objet sf comme emprise — on utilise la France métropolitaine
+france <- ne_countries(country = "France", returnclass = "sf") |>
+  st_transform(4326)
+
+# get_elev_raster() télécharge les tuiles couvrant l'emprise de l'objet sf
+# z = niveau de zoom (1 à 14) — z = 5 ≈ ~5 km, z = 8 ≈ ~600 m, z = 10 ≈ ~150 m
+# src = "aws"  → tuiles AWS (SRTM + 3DEP + GMTED2010, pas de compte requis)
+# src = "gl1"  → SRTM 1 arc-sec (~30 m) via OpenTopography (clé API requise)
+# src = "alos" → ALOS World 3D (~30 m) via OpenTopography (clé API requise)
+
+dem_fr <- get_elev_raster(locations = france, z = 6, src = "aws",
+                           clip = "locations")   # découper sur le contour exact
+
+# Convertir en SpatRaster terra et reprojeter
+dem_fr_terra <- rast(dem_fr)
+dem_fr_l93   <- project(dem_fr_terra, "EPSG:2154")
+
+cat("Résolution après reprojection :", res(dem_fr_l93), "mètres\n")
+
+ggplot() +
+  geom_spatraster(data = dem_fr_l93) +
+  scale_fill_gradientn(colors   = hcl.colors(50, "Terrain"),
+                        name     = "Altitude (m)",
+                        na.value = "transparent") +
+  labs(title   = "MNT France — elevatr (AWS Terrain Tiles, z = 6)",
+       caption = "Source : AWS Terrain Tiles via elevatr | Cours R-Carto") +
+  theme_void(base_size = 12) +
+  theme(plot.title = element_text(face = "bold", hjust = 0.5))
+```
+
+::: callout-tip
+## Choisir le bon niveau de zoom (`z`)
+
+| `z`   | Résolution approx. | Usage                              |
+|-------|--------------------|------------------------------------|
+| 4–5   | 5–10 km            | Vue continentale, aperçu rapide    |
+| 6–7   | 1–5 km             | Pays entier, analyses régionales   |
+| 8–9   | 300–600 m          | Région, département                |
+| 10–11 | 75–150 m           | Zone d'étude locale                |
+| 12–14 | 10–40 m            | Analyse fine (fichiers volumineux) |
+
+Plus le zoom est élevé, plus les fichiers sont lourds et le téléchargement lent. Pour une première exploration, commencez par `z = 6` ou `z = 7`.
+:::
+
+```{r}
+#| label: elevatr-opentopo
+#| eval: false
+
+# Avec OpenTopography (clé API gratuite requise)
+# Créer un compte sur https://portal.opentopography.org/newUser
+# puis récupérer votre clé dans myOpenTopo → API Key
+
+# Enregistrer la clé une fois pour toutes dans votre .Renviron :
+# usethis::edit_r_environ()
+# → ajouter la ligne : OPENTOPO_KEY=votre_cle_ici
+
+# Télécharger le SRTM 1 arc-sec (~30 m) pour une zone précise
+corsica <- ne_states(country = "France", returnclass = "sf") |>
+  dplyr::filter(name == "Corse-du-Sud" | name == "Haute-Corse") |>
+  st_transform(4326)
+
+dem_corse_gl1 <- get_elev_raster(locations = corsica,
+                                  src  = "gl1",       # SRTM 1 arc-sec
+                                  clip = "locations") # découper sur la Corse
+
+dem_corse_terra <- rast(dem_corse_gl1) |>
+  project("EPSG:2154")
+
+ggplot() +
+  geom_spatraster(data = dem_corse_terra) +
+  scale_fill_gradientn(colors   = hcl.colors(50, "Terrain"),
+                        name     = "Altitude (m)",
+                        na.value = "transparent") +
+  labs(title   = "MNT Corse — SRTM 1 arc-sec via OpenTopography",
+       caption = "Source : OpenTopography / SRTM GL1 | Cours R-Carto") +
+  theme_void(base_size = 12) +
+  theme(plot.title = element_text(face = "bold", hjust = 0.5))
+```
+
+::: callout-note
+## Sources disponibles via OpenTopography dans `elevatr`
+
+| `src`          | Produit                       | Résolution |
+|----------------|-------------------------------|------------|
+| `"gl3"`        | SRTM 3 arc-sec                | \~90 m     |
+| `"gl1"`        | SRTM 1 arc-sec                | \~30 m     |
+| `"alos"`       | ALOS World 3D                 | \~30 m     |
+| `"srtm15plus"` | SRTM 15 arc-sec + bathymétrie | \~450 m    |
+
+L'option `"alos"` (satellite japonais ALOS) peut être plus précise que le SRTM dans les zones montagneuses tropicales ou très boisées.
+:::
+
+------------------------------------------------------------------------
+
+## Liens utiles {#sec-links}
+
+- [Documentation de `terra`](https://rspatial.github.io/terra/)
+- [`tidyterra`](https://dieghernan.github.io/tidyterra/) — les rasters dans `ggplot2`
+- [Spatial Data Science with R and `terra`](https://rspatial.org/) — livre en ligne gratuit
+- [Geocomputation with R — opérations sur les rasters](https://r.geocompx.org/spatial-operations.html#spatial-ras)
+
+------------------------------------------------------------------------
+
+> **← Précédent : [Données Raster](raster.qmd)** **→ Suivant : [Géotraitement — Londres](geoprocessing_Londres.qmd)**
+
+------------------------------------------------------------------------
+
+*Dr. Elisabetta Pietrostefani — Directrice Adjointe, Geographic Data Science Lab — Université de Liverpool \| Co-Directrice, [Imago : Data Service for Imagery](https://imago.ac.uk/) \| Chercheuse Associée, London School of Economics*

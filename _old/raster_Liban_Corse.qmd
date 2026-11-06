@@ -1,0 +1,635 @@
+---
+title: "Raster : relief du Liban et de la Corse"
+author: "Dr. Elisabetta Pietrostefani"
+date: today
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    toc-title: "Table des matières"
+    number-sections: true
+    code-fold: show
+    code-tools: true
+    theme: cosmo
+    highlight-style: github
+    embed-resources: true
+    fig-align: center
+    fig-width: 8
+    fig-height: 6
+execute:
+  warning: false
+  message: false
+  echo: true
+---
+
+## Introduction {#sec-intro}
+
+Jusqu'ici, nous avons travaillé avec des données **vectorielles** : des points, des lignes et des polygones, chacun avec une géométrie et une ligne dans un tableau. Les données **raster** fonctionnent autrement : c'est une grille régulière de cellules (ou pixels), chacune portant **une seule valeur**, sans tableau d'attributs.
+
+Cette différence compte plus qu'il n'y paraît. Un raster ne connaît ni les « communes » ni les « ménages » : il sait seulement que la cellule (1450, 2013) vaut 847. Une grande partie du travail sur les rasters consiste donc à faire le pont entre *une grille de nombres* et *les données sociales et administratives* qui nous intéressent.
+
+Nous travaillons sur deux territoires au relief contrasté, une côte méditerranéenne et des montagnes qui dépassent 2 700 m :
+
+- **Partie 1 — Le Liban (guidé)** : on découvre chaque opération pas à pas ;
+- **Partie 2 — La Corse (à vous)** : vous reproduisez la démarche, avec un corrigé à déplier ;
+- **Partie 3 — Comparer** : on met les deux territoires côte à côte.
+
+::: callout-tip
+## Ce que vous saurez faire à la fin
+
+| Opération                          | Fonction            |
+|------------------------------------|---------------------|
+| Charger et explorer un raster      | `rast()`            |
+| Reprojeter                         | `project()`         |
+| Recadrer et masquer                | `crop()` + `mask()` |
+| Changer la résolution              | `aggregate()`       |
+| Calculer la pente                  | `terrain()`         |
+| Reclassifier                       | `classify()`        |
+| Extraire des valeurs en des points | `extract()`         |
+| Calculer des statistiques par zone | `exact_extract()`   |
+:::
+
+```{r}
+#| label: setup
+
+library(terra)          # manipulation des rasters
+library(tidyterra)      # geom_spatraster() et palettes pour ggplot2
+library(sf)             # données vectorielles
+library(ggplot2)        # visualisation
+library(dplyr)          # manipulation de données
+library(exactextractr)  # statistiques zonales
+
+terraOptions(progress = 0)   # masquer les barres de progression de terra
+```
+
+::: {.callout-note collapse="true"}
+## Installer les packages si nécessaire
+
+```{r}
+#| eval: false
+install.packages(c("terra", "tidyterra", "exactextractr"))
+```
+
+`terra` remplace l'ancien package `raster` (déprécié depuis 2023). Si vous trouvez du code en ligne qui utilise `raster`, les fonctions se traduisent assez directement : `raster()` → `rast()`, `extent()` → `ext()`. `tidyterra` permet d'utiliser les rasters dans `ggplot2` avec `geom_spatraster()`.
+:::
+
+------------------------------------------------------------------------
+
+# Partie 1 — Le Liban (guidé) {.unnumbered}
+
+## Charger et explorer le MNT {#sec-lb-load}
+
+Un **MNT** (*Modèle Numérique de Terrain*) est un raster dont chaque cellule contient une altitude.
+
+```{r}
+#| label: lb-load
+
+dem_lb <- rast("data/Liban/LBN_elevation_w_bathymetry.tif")
+dem_lb
+```
+
+Prenez le temps de lire cet affichage. Contrairement à un objet `sf`, il n'y a pas de lignes de tableau, mais :
+
+- les **dimensions** : le nombre de lignes et de colonnes de cellules ;
+- la **résolution** : la taille d'une cellule (ici 0,0025 degré, soit environ 250 m) ;
+- l'**emprise** (*extent*) : le rectangle couvert ;
+- le **système de coordonnées** (SCR) : ici WGS 84, en degrés.
+
+C'est l'anatomie de tous les rasters que vous rencontrerez.
+
+```{r}
+#| label: lb-plot-raw
+plot(dem_lb)
+```
+
+Remarquez les valeurs négatives : ce fichier contient aussi la **bathymétrie** (la profondeur sous le niveau de la mer), c'est pourquoi la Méditerranée apparaît.
+
+## Le contour du pays et son SCR {#sec-lb-vector}
+
+```{r}
+#| label: lb-vector
+
+liban <- read_sf("data/Liban/LBN_adm1.shp")   # les gouvernorats (mohafazat)
+
+st_crs(liban)$input
+crs(dem_lb, describe = TRUE)$name
+```
+
+Les deux SCR sont différents : le raster est en degrés (WGS 84), le vecteur en mètres (Lambert syrien, EPSG:22770). Il faut les aligner avant toute opération.
+
+## Reprojeter le raster {#sec-lb-project}
+
+On reprojette le raster dans le SCR du vecteur. Avantage : ce SCR est en **mètres**, ce qui nous servira pour calculer la pente.
+
+```{r}
+#| label: lb-project
+
+dem_lb <- project(dem_lb, crs(vect(liban)))
+crs(dem_lb, describe = TRUE)$name
+res(dem_lb)   # résolution, désormais en mètres
+```
+
+::: callout-important
+## Reprojeter un raster n'est pas anodin
+
+Reprojeter un **vecteur** déplace simplement des coordonnées. Reprojeter un **raster** oblige à construire une nouvelle grille et à *estimer* la valeur de chaque nouvelle cellule (par interpolation) : les données changent légèrement. Reprojetez une seule fois, le plus tôt possible.
+:::
+
+`vect()` convertit un objet `sf` en objet vecteur de `terra` (`SpatVector`), le format attendu par les fonctions de `terra`.
+
+## Recadrer et masquer {#sec-lb-crop}
+
+Deux opérations pour se limiter à la zone d'étude :
+
+- `crop()` **recadre** sur l'emprise rectangulaire du vecteur : le raster devient plus petit ;
+- `mask()` **masque** tout ce qui est en dehors du contour exact : les cellules extérieures deviennent `NA`.
+
+```{r}
+#| label: lb-crop
+
+dem_lb_crop <- crop(dem_lb, vect(liban))
+dem_lb      <- mask(dem_lb_crop, vect(liban))
+```
+
+```{r}
+#| label: lb-crop-vs-mask
+#| fig-height: 5
+
+par(mfrow = c(1, 2))
+plot(dem_lb_crop, main = "Recadré (crop)")
+plot(dem_lb,      main = "Recadré + masqué (mask)")
+par(mfrow = c(1, 1))
+```
+
+::: callout-tip
+## Pourquoi dans cet ordre ?
+
+`crop()` est une opération rapide (un simple rectangle) ; `mask()` doit tester chaque cellule contre le contour du polygone. **On recadre d'abord, on masque ensuite** : on réduit le problème avant l'étape coûteuse. Sur un grand raster, cela peut faire passer le calcul de plusieurs minutes à quelques secondes.
+:::
+
+## Cartographier le relief {#sec-lb-map}
+
+`tidyterra` fournit `geom_spatraster()`, qui fait entrer un raster dans la grammaire de `ggplot2` que vous connaissez déjà.
+
+```{r}
+#| label: lb-map
+
+ggplot() +
+  geom_spatraster(data = dem_lb) +
+  geom_sf(data = liban, fill = NA, colour = "grey20", linewidth = 0.4) +
+  scale_fill_hypso_c(palette = "dem_poster", na.value = NA,
+                     name = "Altitude (m)") +
+  labs(title    = "Relief du Liban",
+       subtitle = "Modèle numérique de terrain, gouvernorats en surimpression",
+       caption  = "Source : SRTM ; GADM") +
+  theme_void(base_size = 12) +
+  theme(plot.title = element_text(face = "bold"))
+```
+
+`scale_fill_hypso_c()` utilise une palette **hypsométrique** : du vert (plaines) au brun puis au blanc (sommets), la convention des atlas physiques. C'est bien plus lisible pour le relief qu'une palette séquentielle générique.
+
+## Calculer la pente {#sec-lb-slope}
+
+La pente mesure l'inclinaison du terrain, en degrés. `terrain()` la calcule à partir des altitudes des cellules voisines.
+
+```{r}
+#| label: lb-slope
+
+pente_lb <- terrain(dem_lb, v = "slope", unit = "degrees")
+
+global(pente_lb, c("mean", "max"), na.rm = TRUE)
+```
+
+::: callout-important
+## Un SCR en mètres est indispensable
+
+La pente compare une différence d'**altitude** (en mètres) à une distance **horizontale**. Si l'horizontale est en degrés, les deux unités sont incompatibles et la pente est fausse. C'est pourquoi on a reprojeté le MNT en mètres à l'étape précédente.
+:::
+
+```{r}
+#| label: lb-slope-map
+
+ggplot() +
+  geom_spatraster(data = pente_lb) +
+  geom_sf(data = liban, fill = NA, colour = "white", linewidth = 0.4) +
+  scale_fill_viridis_c(option = "magma", na.value = NA, name = "Pente (°)") +
+  labs(title = "Pente du terrain — Liban",
+       caption = "Source : SRTM ; GADM") +
+  theme_void(base_size = 12) +
+  theme(plot.title = element_text(face = "bold"))
+```
+
+Les deux chaînes de montagnes (Mont-Liban à l'ouest, Anti-Liban à l'est) ressortent nettement, séparées par la plaine de la Bekaa.
+
+## Reclassifier en zones d'altitude {#sec-lb-reclass}
+
+La reclassification transforme un raster **continu** en **catégories**, selon des seuils. On utilise une matrice à trois colonnes : *de*, *à*, *nouvelle valeur*. On définit 4 zones, que l'on réutilisera telles quelles pour la Corse afin de pouvoir comparer.
+
+```{r}
+#| label: lb-reclass
+
+rcl <- matrix(c(
+  -Inf,  200, 1,   # Littoral
+   200,  800, 2,   # Basse montagne
+   800, 1500, 3,   # Montagne
+  1500,  Inf, 4    # Haute montagne
+), ncol = 3, byrow = TRUE)
+
+zones_lb <- classify(dem_lb, rcl)
+
+# Noms des zones, utilisés pour la légende et les tableaux
+noms_zones <- c("1" = "Littoral (< 200 m)",
+                "2" = "Basse montagne (200–800 m)",
+                "3" = "Montagne (800–1 500 m)",
+                "4" = "Haute montagne (> 1 500 m)")
+couleurs_zones <- c("1" = "#74add1", "2" = "#fee090",
+                    "3" = "#fc8d59", "4" = "#d73027")
+
+# Part de chaque zone (en % des cellules)
+freq(zones_lb) |>
+  mutate(zone = noms_zones[as.character(value)],
+         part = round(count / sum(count) * 100, 1)) |>
+  select(zone, part)
+```
+
+```{r}
+#| label: lb-reclass-map
+
+ggplot() +
+  geom_spatraster(data = as.factor(zones_lb)) +
+  scale_fill_manual(values = couleurs_zones, labels = noms_zones,
+                    na.value = NA, na.translate = FALSE,
+                    name = "Zone d'altitude") +
+  labs(title = "Zones d'altitude — Liban") +
+  theme_void(base_size = 12) +
+  theme(plot.title = element_text(face = "bold"))
+```
+
+## Du raster au vecteur (1) : extraire des valeurs en des points {#sec-lb-extract}
+
+Voici le pont entre les deux modèles de données. On dispose d'un raster d'altitude et d'un ensemble de **points** : 2 000 ménages enquêtés (localisations fictives). On veut que chaque ménage connaisse son altitude.
+
+```{r}
+#| label: lb-extract
+
+menages <- read_sf("data/Liban/random_survey_LBN.shp")
+st_crs(menages)$input                         # WGS 84 : pas le même SCR que le raster !
+
+menages <- st_transform(menages, crs(dem_lb)) # on aligne les SCR
+
+# extract() lit la valeur du raster à chaque point
+alt <- terra::extract(dem_lb, vect(menages))
+menages$altitude <- alt[[2]]                  # 1re colonne = ID, 2e = valeur
+
+summary(menages$altitude)
+```
+
+::: callout-important
+## Une colonne remplie de `NA` ?
+
+C'est presque toujours un problème de **SCR** : les points et le raster ne sont pas dans le même système. Vérifiez avec `crs(dem_lb)` et `st_crs(menages)`, et reprojetez avant d'extraire. Ici, quelques `NA` sont normaux : ce sont des points situés juste en dehors du masque (en mer ou hors frontière).
+:::
+
+À partir de là, l'altitude est un attribut comme un autre : on peut la résumer, la modéliser, ou la cartographier.
+
+```{r}
+#| label: lb-extract-map
+
+ggplot() +
+  geom_sf(data = liban, fill = "grey95", colour = "grey60") +
+  geom_sf(data = filter(menages, !is.na(altitude)),
+          aes(colour = altitude), size = 0.8) +
+  scale_colour_hypso_c(palette = "dem_poster", name = "Altitude (m)") +
+  labs(title = "Altitude des ménages enquêtés") +
+  theme_void(base_size = 12) +
+  theme(plot.title = element_text(face = "bold"))
+```
+
+## Du raster au vecteur (2) : statistiques zonales {#sec-lb-zonal}
+
+Les **statistiques zonales** résument toutes les cellules situées dans chaque polygone : on obtient **une valeur par zone administrative**, que l'on peut joindre et cartographier comme n'importe quelle variable. C'est le lien direct avec les cartes choroplèthes.
+
+`exact_extract()` est rapide et tient compte des cellules qui ne sont que **partiellement** dans un polygone, en les pondérant par la fraction couverte.
+
+```{r}
+#| label: lb-zonal
+
+liban$alt_moy   <- exact_extract(dem_lb,   liban, "mean", progress = FALSE)
+liban$pente_moy <- exact_extract(pente_lb, liban, "mean", progress = FALSE)
+
+liban |>
+  st_drop_geometry() |>
+  select(NAME_1, alt_moy, pente_moy) |>
+  arrange(desc(alt_moy))
+```
+
+```{r}
+#| label: lb-zonal-map
+
+ggplot(liban) +
+  geom_sf(aes(fill = alt_moy), colour = "white", linewidth = 0.4) +
+  scale_fill_distiller(palette = "YlOrBr", direction = 1,
+                       name = "Altitude\nmoyenne (m)") +
+  labs(title    = "Altitude moyenne par gouvernorat — Liban",
+       subtitle = "Statistiques zonales à partir du MNT",
+       caption  = "Source : SRTM ; GADM") +
+  theme_void(base_size = 12) +
+  theme(plot.title = element_text(face = "bold"))
+```
+
+La partie raster est terminée : le résultat est un objet `sf` ordinaire, avec une colonne numérique. C'est désormais une **carte choroplèthe** comme celles des séances précédentes.
+
+------------------------------------------------------------------------
+
+# Partie 2 — La Corse (à vous) {.unnumbered}
+
+La Corse présente un relief comparable au Liban : une côte méditerranéenne et un massif montagneux qui culmine au Monte Cinto (2 706 m). Reproduisez la démarche de la partie 1. Le corrigé de chaque étape est à déplier, **essayez d'abord par vous-mêmes**.
+
+**Fichiers disponibles :**
+
+| Fichier | Description |
+|------------------------------------|------------------------------------|
+| `data/France/Corse/Corse_tout_lambert.tif` | MNT de la Corse, en Lambert 93 (mètres) |
+| `data/France/gadm41_FRA_shp/gadm41_FRA_5.shp` | Communes de France (GADM, niveau 5) |
+
+## Exercice 1 — Charger et explorer le MNT {#sec-co-load}
+
+Chargez le MNT de la Corse. Quel est son SCR ? Sa résolution ? Combien de cellules contient-il ? Comparez avec le Liban.
+
+::: {.callout-tip collapse="true"}
+## Corrigé
+
+```{r}
+#| label: co-load
+
+dem_co <- rast("data/France/Corse/Corse_tout_lambert.tif")
+dem_co
+ncell(dem_co)    # nombre de cellules
+```
+
+Le MNT est déjà en **Lambert 93** (EPSG:2154), en mètres : pas besoin de le reprojeter. Mais sa résolution est d'environ **27 m**, contre environ 250 m pour le Liban, et il compte plus de 57 millions de cellules, ce qui rendra certains calculs lents.
+:::
+
+## Exercice 2 — Harmoniser la résolution {#sec-co-aggregate}
+
+Pour comparer les deux territoires, il faut travailler **à la même résolution** : une pente calculée sur des cellules de 27 m n'est pas comparable à une pente calculée sur des cellules de 250 m (plus les cellules sont fines, plus on capte de pentes fortes). Utilisez `aggregate()` pour ramener le MNT corse à une résolution proche de celle du Liban.
+
+::: {.callout-tip collapse="true"}
+## Corrigé
+
+```{r}
+#| label: co-aggregate
+
+# fact = 9 : on regroupe 9 × 9 cellules de 27 m en une cellule d'environ 245 m,
+# dont la valeur est la moyenne des 81 cellules d'origine
+dem_co <- aggregate(dem_co, fact = 9, fun = "mean")
+
+res(dem_co)
+ncell(dem_co)
+```
+
+Le raster est maintenant environ 80 fois plus léger, et directement comparable au Liban.
+:::
+
+::: callout-note
+## Et si le MNT était découpé en tuiles ?
+
+Les MNT à haute résolution sont souvent distribués en **tuiles** (`DEM_corse_1.tif` à `DEM_corse_4.tif` dans le dossier). On les assemble avec `mosaic(t1, t2, t3, t4, fun = "mean")` : la fonction `"mean"` s'applique aux cellules qui se chevauchent sur les bords.
+:::
+
+## Exercice 3 — Recadrer et masquer {#sec-co-crop}
+
+Chargez les communes de France, gardez celles de la Corse (`NAME_1 == "Corse"`), mettez-les dans le SCR du MNT, puis recadrez et masquez le MNT.
+
+::: {.callout-tip collapse="true"}
+## Corrigé
+
+```{r}
+#| label: co-crop
+
+communes_co <- read_sf("data/France/gadm41_FRA_shp/gadm41_FRA_5.shp") |>
+  filter(NAME_1 == "Corse") |>
+  st_transform(crs(dem_co))    # GADM est en WGS 84 : on passe en Lambert 93
+
+nrow(communes_co)              # 360 communes
+
+dem_co <- crop(dem_co, vect(communes_co)) |>
+  mask(vect(communes_co))
+```
+
+Ici, on reprojette le **vecteur** plutôt que le raster : c'est sans perte, et le raster est déjà dans un SCR en mètres.
+:::
+
+## Exercice 4 — Cartographier le relief {#sec-co-map}
+
+Réalisez une carte hypsométrique du MNT corse, avec un titre et une source.
+
+::: {.callout-tip collapse="true"}
+## Corrigé
+
+```{r}
+#| label: co-map
+
+ggplot() +
+  geom_spatraster(data = dem_co) +
+  scale_fill_hypso_c(palette = "dem_poster", na.value = NA,
+                     name = "Altitude (m)") +
+  labs(title   = "Relief de la Corse",
+       caption = "Source : MNT Corse ; GADM") +
+  theme_void(base_size = 12) +
+  theme(plot.title = element_text(face = "bold"))
+```
+:::
+
+## Exercice 5 — Calculer la pente {#sec-co-slope}
+
+Calculez la pente en degrés, puis sa moyenne et son maximum. Pourquoi peut-on la calculer directement sur ce MNT ?
+
+::: {.callout-tip collapse="true"}
+## Corrigé
+
+```{r}
+#| label: co-slope
+
+pente_co <- terrain(dem_co, v = "slope", unit = "degrees")
+
+global(pente_co, c("mean", "max"), na.rm = TRUE)
+
+ggplot() +
+  geom_spatraster(data = pente_co) +
+  scale_fill_viridis_c(option = "magma", na.value = NA, name = "Pente (°)") +
+  labs(title = "Pente du terrain — Corse") +
+  theme_void(base_size = 12) +
+  theme(plot.title = element_text(face = "bold"))
+```
+
+On peut la calculer directement car le MNT est en **Lambert 93**, donc en mètres : altitude et distances horizontales ont la même unité.
+:::
+
+## Exercice 6 — Reclassifier en zones d'altitude {#sec-co-reclass}
+
+Reclassifiez le MNT avec **la même matrice** `rcl` que pour le Liban, puis calculez la part de chaque zone.
+
+::: {.callout-tip collapse="true"}
+## Corrigé
+
+```{r}
+#| label: co-reclass
+
+zones_co <- classify(dem_co, rcl)   # même matrice que pour le Liban
+
+freq(zones_co) |>
+  mutate(zone = noms_zones[as.character(value)],
+         part = round(count / sum(count) * 100, 1)) |>
+  select(zone, part)
+
+ggplot() +
+  geom_spatraster(data = as.factor(zones_co)) +
+  scale_fill_manual(values = couleurs_zones, labels = noms_zones,
+                    na.value = NA, na.translate = FALSE,
+                    name = "Zone d'altitude") +
+  labs(title = "Zones d'altitude — Corse") +
+  theme_void(base_size = 12) +
+  theme(plot.title = element_text(face = "bold"))
+```
+:::
+
+## Exercice 7 — Statistiques zonales par commune {#sec-co-zonal}
+
+Calculez l'altitude moyenne de chaque commune corse avec `exact_extract()`, puis cartographiez-la. Quelles sont les communes les plus hautes ?
+
+::: {.callout-tip collapse="true"}
+## Corrigé
+
+```{r}
+#| label: co-zonal
+
+communes_co$alt_moy <- exact_extract(dem_co, communes_co, "mean", progress = FALSE)
+
+communes_co |>
+  st_drop_geometry() |>
+  select(NAME_5, alt_moy) |>
+  arrange(desc(alt_moy)) |>
+  head(5)
+
+ggplot(communes_co) +
+  geom_sf(aes(fill = alt_moy), colour = "white", linewidth = 0.1) +
+  scale_fill_hypso_c(palette = "dem_poster", name = "Altitude\nmoyenne (m)") +
+  labs(title    = "Altitude moyenne par commune — Corse",
+       subtitle = "Statistiques zonales à partir du MNT",
+       caption  = "Source : MNT Corse ; GADM v4.1") +
+  theme_void(base_size = 12) +
+  theme(plot.title = element_text(face = "bold"))
+```
+
+Avec 360 communes, la carte est beaucoup plus détaillée que celle des gouvernorats libanais : le choix des **unités spatiales** change ce que la carte montre.
+:::
+
+------------------------------------------------------------------------
+
+# Partie 3 — Comparer le Liban et la Corse {.unnumbered}
+
+## Un tableau de synthèse {#sec-compare-table}
+
+Les deux MNT sont maintenant à une résolution comparable (environ 250 m), dans des SCR en mètres, et reclassifiés avec les mêmes seuils : on peut les comparer.
+
+```{r}
+#| label: compare-table
+
+synthese <- data.frame(
+  territoire = c("Liban", "Corse"),
+  alt_moy    = c(global(dem_lb,   "mean", na.rm = TRUE)[[1]],
+                 global(dem_co,   "mean", na.rm = TRUE)[[1]]),
+  alt_max    = c(global(dem_lb,   "max",  na.rm = TRUE)[[1]],
+                 global(dem_co,   "max",  na.rm = TRUE)[[1]]),
+  pente_moy  = c(global(pente_lb, "mean", na.rm = TRUE)[[1]],
+                 global(pente_co, "mean", na.rm = TRUE)[[1]]),
+  # surface = nombre de cellules non vides × surface d'une cellule (en km²)
+  surface_km2 = c(global(!is.na(dem_lb), "sum")[[1]] * prod(res(dem_lb)) / 1e6,
+                  global(!is.na(dem_co), "sum")[[1]] * prod(res(dem_co)) / 1e6)
+)
+
+knitr::kable(synthese, digits = c(0, 0, 0, 1, 0),
+             col.names = c("Territoire", "Altitude moy. (m)", "Altitude max. (m)",
+                           "Pente moy. (°)", "Surface (km²)"),
+             caption = "Comparaison topographique Liban / Corse")
+```
+
+## Comparer les zones d'altitude {#sec-compare-zones}
+
+```{r}
+#| label: compare-zones
+#| fig-height: 4
+
+parts <- bind_rows(
+  freq(zones_lb) |> mutate(territoire = "Liban"),
+  freq(zones_co) |> mutate(territoire = "Corse")
+) |>
+  group_by(territoire) |>
+  mutate(part = count / sum(count) * 100,
+         zone = factor(noms_zones[as.character(value)], levels = noms_zones)) |>
+  ungroup()
+
+ggplot(parts, aes(x = territoire, y = part, fill = zone)) +
+  geom_col(width = 0.6) +
+  scale_fill_manual(values = setNames(couleurs_zones, noms_zones),
+                    name = "Zone d'altitude") +
+  labs(x = NULL, y = "Part du territoire (%)",
+       title = "Répartition du territoire par zone d'altitude") +
+  coord_flip() +
+  theme_minimal(base_size = 12) +
+  theme(plot.title = element_text(face = "bold"),
+        legend.position = "bottom", legend.direction = "vertical")
+```
+
+::: callout-note
+## À discuter
+
+- Lequel des deux territoires est le plus **montagneux** ? Le plus **escarpé** ? Est-ce la même chose ?
+- La surface calculée à partir des cellules est-elle exactement celle des sources officielles (Liban : 10 452 km² ; Corse : 8 680 km²) ? Pourquoi pas ?
+- L'altitude maximale de la Corse dans le tableau est inférieure à celle du Monte Cinto (2 706 m). Pourquoi ? (Indice : que fait `aggregate(fun = "mean")` aux sommets ?)
+- Que se passerait-il si l'on comparait la pente du Liban (cellules de 250 m) à celle de la Corse **sans** agréger le MNT corse (cellules de 27 m) ?
+:::
+
+------------------------------------------------------------------------
+
+## Récapitulatif {#sec-summary}
+
+::: callout-note
+## Les opérations raster essentielles
+
+``` r
+# 1. Charger et explorer
+dem <- rast("fichier.tif")
+
+# 2. Reprojeter (une seule fois, le plus tôt possible)
+dem <- project(dem, crs(vect(vecteur)))
+
+# 3. Recadrer puis masquer
+dem <- crop(dem, vect(vecteur)) |> mask(vect(vecteur))
+
+# 4. Harmoniser la résolution
+dem <- aggregate(dem, fact = 9, fun = "mean")
+
+# 5. Pente (SCR en mètres obligatoire)
+pente <- terrain(dem, v = "slope", unit = "degrees")
+
+# 6. Reclassifier
+zones <- classify(dem, matrix(c(-Inf, 200, 1, 200, Inf, 2), ncol = 3, byrow = TRUE))
+
+# 7. Du raster au vecteur
+points$alt <- terra::extract(dem, vect(points))[[2]]           # en des points
+polygones$alt_moy <- exact_extract(dem, polygones, "mean")     # par zone
+```
+:::
+
+## Liens utiles {#sec-links}
+
+- [Documentation de `terra`](https://rspatial.github.io/terra/)
+- [`tidyterra`](https://dieghernan.github.io/tidyterra/) — les rasters dans `ggplot2`
+- [Spatial Data Science with R and `terra`](https://rspatial.org/) — livre en ligne gratuit
+- [Geocomputation with R — opérations sur les rasters](https://r.geocompx.org/spatial-operations.html#spatial-ras)
+
+------------------------------------------------------------------------
+
+*Dr. Elisabetta Pietrostefani — Directrice Adjointe, Geographic Data Science Lab — Université de Liverpool \| Co-Directrice, [Imago : Data Service for Imagery](https://imago.ac.uk/) \| Chercheuse Associée, London School of Economics*

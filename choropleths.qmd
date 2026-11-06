@@ -12,7 +12,6 @@ format:
     code-tools: true
     theme: cosmo
     highlight-style: github
-    embed-resources: true
     fig-align: center
     fig-width: 8
     fig-height: 6
@@ -564,12 +563,12 @@ Les choix cartographiques sont des **choix éditoriaux** — ils ne sont jamais 
 ::: callout-tip
 ## Exercice : appliquer sur des données réelles
 
-Mettez en pratique ces méthodes de classification sur les **départements de France métropolitaine** (densité de population, données INSEE 2022) : **[Exercice : cartes choroplèthes sur la France](choropleths_France.qmd)**.
+Mettez en pratique ces méthodes de classification sur les **départements de France métropolitaine** (densité de population, données INSEE 2022) : [**Exercice : cartes choroplèthes sur la France**](choropleths_France.qmd).
 :::
 
 ------------------------------------------------------------------------
 
-> **← Section précédente : [Introduction à la Cartographie](introduction.qmd)** **→ Section suivante : Manipulation d'Objets Vectoriels** *(à venir)*
+> **← Précédent : [Objets Spatiaux](simplefeatures.qmd)** **→ Suivant : [Systèmes de Coordonnées](crs.qmd)**
 
 ------------------------------------------------------------------------
 

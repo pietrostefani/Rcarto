@@ -12,7 +12,6 @@ format:
     code-tools: true
     theme: cosmo
     highlight-style: github
-    embed-resources: true
     fig-align: center
     fig-width: 8
     fig-height: 7
@@ -877,7 +876,7 @@ Documentation complète : [ggplot2.tidyverse.org/reference/ggsave](https://ggplo
 
 ------------------------------------------------------------------------
 
-> **← Précédent : [Géotraitement — Londres](geoprocessing_Londres.qmd)** **→ Suivant : Calculs d'Indices Topographiques**
+> **← Retour au cours : [Géotraitement — Londres](geoprocessing_Londres.qmd)**
 
 ------------------------------------------------------------------------
 

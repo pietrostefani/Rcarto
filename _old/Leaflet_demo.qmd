@@ -1,0 +1,168 @@
+---
+title: "Leaflet_Privation"
+author: "Elisabetta Pietrostefani"
+date: "2024-10-02"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(leaflet)
+library(units)
+library(sf)
+options(readr.show_col_types = FALSE)
+```
+
+```{r 1}
+#créer un dossier de sortie
+msoa <- read_sf("data/London/statistical-gis-boundaries-london/ESRI/MSOA_2011_London_gen_MHW.shp")
+depriv <- read_csv("data/London/Tables/depriv_data.csv")
+
+```
+
+Clean London data Join the MSOA data with the deprivation data and clean the results a little. Here we calculate MSOA polygon areas and calculate population density in thousands of people/Km:
+
+Joindre les données MSOA aux données sur la privation et nettoyez un peu les résultats. Ici, nous calculons les zones de polygones MSOA et nous calculons la densité de population en centaines de personnes/Km:
+
+```{r}
+london_depriv = msoa %>%
+  left_join(depriv, by = c("MSOA11CD" = "msoacode")) %>%
+  filter(!is.na(msoaname)) %>%
+  mutate(area = drop_units(set_units(st_area(.), km^2))) %>%
+  mutate(pop_density = (population/area)/1000) %>% #k-people/km2
+  st_transform(4326)
+```
+
+Définir les options de la visualisation
+
+Ici, nous créons des bacs pour la variable de densité de population et des 8 quantiles pour l'indice de deprivation et le pourcentage d'adultes de plus de 60 ans vivant avec des crédits de pension. Avec ceux-ci, nous créons des palettes de couleurs pour chaque couche:
+
+```{r bins }
+bins_dens = c(min(london_depriv$pop_density), 5, 10, 15, 20, 25, max(london_depriv$pop_density))
+
+pal_dens <- colorBin(palette = "Greens", domain = london_depriv$pop_density, bins = bins_dens)
+pal_depr <- colorQuantile("Blues", domain = london_depriv$perc_depr_households, n = 8)
+pal_pens <- colorQuantile("Reds", domain = london_depriv$perc_pensioncredit, n = 8)
+```
+
+Créez des étiquettes interactives.
+
+```{r 3 }
+# https://www.rdocumentation.org/packages/base/versions/3.6.2/topics/sprintf
+labels_dens <- sprintf(
+  "<strong>%s</strong><br/>%g k-people / km<sup>2</sup>",
+  london_depriv$msoaname, london_depriv$pop_density
+) %>% lapply(htmltools::HTML)
+
+labels_depr <- sprintf(
+  "<strong>%s</strong><br/>%s",
+  london_depriv$msoaname, paste0("Deprivation Index: ", london_depriv$perc_depr_households, "%")
+) %>% lapply(htmltools::HTML)
+
+labels_pens <- sprintf(
+  "<strong>%s</strong><br/>%s",
+  london_depriv$msoaname, paste0("60+ adults on pension credits: ",london_depriv$perc_pensioncredit, "%")
+) %>% lapply(htmltools::HTML)
+```
+
+Construire une carte avec Leaflet Avec un peu d'ajustement mais en général tiré du dépliant pour la carte choroplèthe R. Explorez cette page pour une cartographie interactive Leaflet en R. <https://rstudio.github.io/leaflet/choropleths.html>
+
+```{r london depriv}
+london_depriv_map = leaflet(london_depriv) %>%
+  addProviderTiles(providers$CartoDB.Positron) %>%
+  setView(-0.118092, 51.509865, 9) %>%
+  addPolygons(
+    fillColor = ~pal_dens(pop_density),
+    weight = 0.5,
+    opacity = 1,
+    color = "grey",
+    dashArray = "",
+    group = "Population Density (k-people/km<sup>2</sup>)",
+    fillOpacity = 0.85,
+    highlightOptions = highlightOptions(
+      weight = 4,
+      color = "darkgrey",
+      dashArray = "",
+      fillOpacity = 0.85,
+      bringToFront = TRUE),
+    label = labels_dens,
+    labelOptions = labelOptions(
+      style = list("font-weight" = "normal", padding = "3px 8px"),
+      textsize = "15px",
+      direction = "auto")) %>%
+   addPolygons(
+    fillColor = ~pal_depr(perc_depr_households),
+    weight = 0.5,
+    opacity = 1,
+    color = "grey",
+    dashArray = "",
+    group = "Deprivation Index",
+    fillOpacity = 0.85,
+    highlightOptions = highlightOptions(
+      weight = 4,
+      color = "darkgrey",
+      dashArray = "",
+      fillOpacity = 0.85,
+      bringToFront = TRUE),
+    label = labels_depr,
+    labelOptions = labelOptions(
+      style = list("font-weight" = "normal", padding = "3px 8px"),
+      textsize = "15px",
+      direction = "auto")) %>%
+  addPolygons(
+    fillColor = ~pal_pens(perc_pensioncredit),
+    weight = 0.5,
+    opacity = 1,
+    color = "grey",
+    dashArray = "",
+    group = "Percentage of 60+ adults on Pension Credits",
+    fillOpacity = 0.85,
+    highlightOptions = highlightOptions(
+      weight = 4,
+      color = "darkgrey",
+      dashArray = "",
+      fillOpacity = 0.85,
+      bringToFront = TRUE),
+    label = labels_pens,
+    labelOptions = labelOptions(
+      style = list("font-weight" = "normal", padding = "3px 8px"),
+      textsize = "15px",
+      direction = "auto")) %>%
+  addLegend("topleft", pal = pal_dens, values = ~pop_density,
+    title = "Population Density",
+    opacity = 1, 
+    labFormat = function(type, cuts, p) {
+    n = length(cuts)
+    paste0(round(cuts, 1)[-n], " - ", round(cuts, 1)[-1], " k-people/km<sup>2</sup>")
+  },
+    group = "Population Density (k-people/km<sup>2</sup>)") %>%
+  addLegend("bottomleft", pal = pal_depr, values = ~perc_depr_households,
+    title = "Deprivation Index",
+    opacity = 1, 
+    labFormat = function(type, cuts, p) {
+    n = length(cuts)
+    paste0(round(cuts, 1)[-n], " - ", round(cuts, 1)[-1], "%")
+  },
+    group = "Deprivation Index") %>%
+  addLegend("bottomright", pal = pal_pens, values = ~perc_pensioncredit,
+    title = "60+ adults on Pension Credits",
+    opacity = 1, 
+    labFormat = function(type, cuts, p) {
+    n = length(cuts)
+    paste0(round(cuts, 1)[-n], " - ", round(cuts, 1)[-1], "%")
+  },
+    group = "Percentage of 60+ adults on Pension Credits") %>%
+  addLayersControl(
+    overlayGroups = c("Population Density (k-people/km<sup>2</sup>)", "Deprivation Index", "Percentage of 60+ adults on Pension Credits"),
+    options = layersControlOptions(collapsed = FALSE)
+  ) %>% 
+  hideGroup("Deprivation Index") %>%
+  hideGroup("Percentage of 60+ adults on Pension Credits")
+```
+
+Cartographiez le résultat !
+
+```{r print map}
+london_depriv_map
+```

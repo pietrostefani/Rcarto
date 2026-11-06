@@ -1,83 +1,67 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://pietrostefani.github.io/pop-displacement-disaster/index.html</loc>
-    <lastmod>2026-03-21T11:41:19.648Z</lastmod>
-  </url>
-  <url>
-    <loc>https://pietrostefani.github.io/pop-displacement-disaster/introduction.html</loc>
-    <lastmod>2026-03-21T11:46:01.864Z</lastmod>
-  </url>
-  <url>
-    <loc>https://pietrostefani.github.io/pop-displacement-disaster/choropleths.html</loc>
-    <lastmod>2026-03-21T12:01:54.927Z</lastmod>
-  </url>
-  <url>
-    <loc>https://pietrostefani.github.io/pop-displacement-disaster/data.html</loc>
-    <lastmod>2025-05-20T19:03:36.795Z</lastmod>
-  </url>
-  <url>
-    <loc>https://pietrostefani.github.io/pop-displacement-disaster/references.html</loc>
-    <lastmod>2025-05-15T08:17:34.860Z</lastmod>
-  </url>
-  <url>
-    <loc>https://pietrostefani.github.io/rcarto/choropleths.html</loc>
-    <lastmod>2026-11-05T12:55:15.453Z</lastmod>
+    <loc>https://pietrostefani.github.io/rcarto/index.html</loc>
+    <lastmod>2026-11-06T10:31:45.271Z</lastmod>
   </url>
   <url>
     <loc>https://pietrostefani.github.io/rcarto/introduction.html</loc>
-    <lastmod>2026-11-05T12:56:44.603Z</lastmod>
-  </url>
-  <url>
-    <loc>https://pietrostefani.github.io/rcarto/1_1_R_pourlacartographie.html</loc>
-    <lastmod>2026-03-21T12:18:47.832Z</lastmod>
-  </url>
-  <url>
-    <loc>https://pietrostefani.github.io/rcarto/1_2_R_pourlacartographie.html</loc>
-    <lastmod>2026-03-21T12:18:54.279Z</lastmod>
+    <lastmod>2026-11-06T11:34:03.109Z</lastmod>
   </url>
   <url>
     <loc>https://pietrostefani.github.io/rcarto/simplefeatures.html</loc>
-    <lastmod>2026-03-22T22:55:05.809Z</lastmod>
+    <lastmod>2026-11-06T11:47:43.367Z</lastmod>
+  </url>
+  <url>
+    <loc>https://pietrostefani.github.io/rcarto/choropleths.html</loc>
+    <lastmod>2026-11-06T11:34:03.080Z</lastmod>
   </url>
   <url>
     <loc>https://pietrostefani.github.io/rcarto/crs.html</loc>
-    <lastmod>2026-03-21T23:20:38.344Z</lastmod>
+    <lastmod>2026-11-06T11:34:03.088Z</lastmod>
   </url>
   <url>
     <loc>https://pietrostefani.github.io/rcarto/raster.html</loc>
-    <lastmod>2026-03-24T07:08:52.364Z</lastmod>
+    <lastmod>2026-11-06T11:34:03.121Z</lastmod>
+  </url>
+  <url>
+    <loc>https://pietrostefani.github.io/rcarto/raster_Liban.html</loc>
+    <lastmod>2026-11-06T11:34:03.130Z</lastmod>
   </url>
   <url>
     <loc>https://pietrostefani.github.io/rcarto/geoprocessing_Londres.html</loc>
-    <lastmod>2026-03-22T00:32:51.567Z</lastmod>
-  </url>
-  <url>
-    <loc>https://pietrostefani.github.io/rcarto/index.html</loc>
-    <lastmod>2026-11-05T12:56:33.009Z</lastmod>
-  </url>
-  <url>
-    <loc>https://pietrostefani.github.io/rcarto/indices_topo.html</loc>
-    <lastmod>2026-03-24T12:58:50.962Z</lastmod>
-  </url>
-  <url>
-    <loc>https://pietrostefani.github.io/rcarto/geoprocessing_Paris.html</loc>
-    <lastmod>2026-03-24T06:28:05.503Z</lastmod>
-  </url>
-  <url>
-    <loc>https://pietrostefani.github.io/rcarto/indices_topo_Corse.html</loc>
-    <lastmod>2026-03-21T22:56:05.406Z</lastmod>
+    <lastmod>2026-11-06T11:34:03.091Z</lastmod>
   </url>
   <url>
     <loc>https://pietrostefani.github.io/rcarto/interpolation.html</loc>
-    <lastmod>2026-03-22T22:56:55.140Z</lastmod>
+    <lastmod>2026-11-06T11:34:03.100Z</lastmod>
   </url>
   <url>
-    <loc>https://pietrostefani.github.io/rcarto/interpolation_Paris.html</loc>
-    <lastmod>2026-03-22T22:57:21.711Z</lastmod>
+    <loc>https://pietrostefani.github.io/rcarto/cartes_interactives.html</loc>
+    <lastmod>2026-11-06T11:34:19.297Z</lastmod>
+  </url>
+  <url>
+    <loc>https://pietrostefani.github.io/rcarto/leaflet_Londres.html</loc>
+    <lastmod>2026-11-06T11:35:37.497Z</lastmod>
   </url>
   <url>
     <loc>https://pietrostefani.github.io/rcarto/choropleths_France.html</loc>
-    <lastmod>2026-11-05T12:52:58.393Z</lastmod>
+    <lastmod>2026-11-06T11:34:03.085Z</lastmod>
+  </url>
+  <url>
+    <loc>https://pietrostefani.github.io/rcarto/raster_Corse.html</loc>
+    <lastmod>2026-11-06T11:34:03.124Z</lastmod>
+  </url>
+  <url>
+    <loc>https://pietrostefani.github.io/rcarto/geoprocessing_Paris.html</loc>
+    <lastmod>2026-11-06T11:34:03.097Z</lastmod>
+  </url>
+  <url>
+    <loc>https://pietrostefani.github.io/rcarto/interpolation_Paris.html</loc>
+    <lastmod>2026-11-06T11:34:03.105Z</lastmod>
+  </url>
+  <url>
+    <loc>https://pietrostefani.github.io/rcarto/cartes_interactives_Paris.html</loc>
+    <lastmod>2026-11-06T11:42:07.830Z</lastmod>
   </url>
 </urlset>

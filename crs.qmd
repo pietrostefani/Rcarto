@@ -12,7 +12,6 @@ format:
     code-tools: true
     theme: cosmo
     highlight-style: github
-    embed-resources: true
     fig-align: center
     fig-width: 8
     fig-height: 6
@@ -61,9 +60,9 @@ Les systèmes géographiques identifient tout emplacement sur Terre via **longit
 
 La surface terrestre est modélisée par un **ellipsoïde**. L'ellipsoïde combiné à un point d'ancrage forme un **datum** :
 
--   **WGS84** — géocentrique, utilisé par le GPS et la plupart des données mondiales
--   **RGF93** — datum officiel de la France métropolitaine
--   **NAD83** — Amérique du Nord
+- **WGS84** — géocentrique, utilisé par le GPS et la plupart des données mondiales
+- **RGF93** — datum officiel de la France métropolitaine
+- **NAD83** — Amérique du Nord
 
 ### Systèmes de coordonnées projetées
 
@@ -130,8 +129,8 @@ new_vector <- st_set_crs(new_vector, "EPSG:4326")
 ::: callout-warning
 ## `st_set_crs()` ≠ `st_transform()`
 
--   `st_set_crs()` **déclare** le SCR sans toucher aux coordonnées — à utiliser quand le SCR est absent ou mal renseigné
--   `st_transform()` **reprojecte** les coordonnées vers un nouveau SCR — à utiliser pour changer de projection
+- `st_set_crs()` **déclare** le SCR sans toucher aux coordonnées — à utiliser quand le SCR est absent ou mal renseigné
+- `st_transform()` **reprojecte** les coordonnées vers un nouveau SCR — à utiliser pour changer de projection
 
 Confondre les deux est l'une des erreurs les plus fréquentes en SIG.
 :::
@@ -191,10 +190,10 @@ p1 / p2 / p3
 ::: callout-tip
 ## Quelle projection choisir ?
 
--   **France métropolitaine** → Lambert-93 (`EPSG:2154`) — projection officielle de l'IGN
--   **Données mondiales** → WGS84 pour stocker, Mollweide pour visualiser l'aire
--   **Cartes web** → Web Mercator (`EPSG:3857`)
--   **Toute analyse de distance ou de superficie** → toujours une projection en mètres
+- **France métropolitaine** → Lambert-93 (`EPSG:2154`) — projection officielle de l'IGN
+- **Données mondiales** → WGS84 pour stocker, Mollweide pour visualiser l'aire
+- **Cartes web** → Web Mercator (`EPSG:3857`)
+- **Toute analyse de distance ou de superficie** → toujours une projection en mètres
 :::
 
 ------------------------------------------------------------------------
@@ -298,13 +297,13 @@ ggplot(france_reg_lambert) +
 
 ## Liens utiles {#sec-links}
 
--   [Geocomputation with R — Ch. 6 : Reprojecting geographic data](https://geocompr.robinlovelace.net/reproj-geo-data.html)
--   [epsg.io](https://epsg.io) — rechercher n'importe quel code EPSG
--   [Projection Wizard](https://projectionwizard.org) — outil pour choisir la bonne projection
+- [Geocomputation with R — Ch. 6 : Reprojecting geographic data](https://geocompr.robinlovelace.net/reproj-geo-data.html)
+- [epsg.io](https://epsg.io) — rechercher n'importe quel code EPSG
+- [Projection Wizard](https://projectionwizard.org) — outil pour choisir la bonne projection
 
 ------------------------------------------------------------------------
 
-> **← Précédent : [Données Spatiales et Simple Features](1_1_R_pourlacartographie.qmd)** **→ Suivant : [Données Raster](1_3_raster.qmd)**
+> **← Précédent : [Choroplèthes](choropleths.qmd)** **→ Suivant : [Données Raster](raster.qmd)**
 
 ------------------------------------------------------------------------
 

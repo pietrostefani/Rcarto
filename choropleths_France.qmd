@@ -1,5 +1,5 @@
 ---
-title: "Choroplèthes France"
+title: "Choroplèthes : France"
 author: "Dr. Elisabetta Pietrostefani"
 date: today
 format:
@@ -12,7 +12,6 @@ format:
     code-tools: true
     theme: cosmo
     highlight-style: github
-    embed-resources: true
     fig-align: center
     fig-width: 8
     fig-height: 6

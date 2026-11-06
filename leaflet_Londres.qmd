@@ -1,0 +1,306 @@
+---
+title: "Leaflet : privation à Londres"
+author: "Dr. Elisabetta Pietrostefani"
+date: today
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    toc-title: "Table des matières"
+    number-sections: true
+    code-fold: show
+    code-tools: true
+    theme: cosmo
+    highlight-style: github
+    fig-align: center
+execute:
+  warning: false
+  message: false
+  echo: true
+---
+
+## Introduction {#sec-intro}
+
+Dans le chapitre précédent, nous avons construit des cartes interactives couche par couche. Ici, on assemble ces éléments dans une **vraie application cartographique** : une carte de Londres où l'utilisateur choisit l'indicateur à afficher, le fond de carte, et peut explorer chaque quartier.
+
+Nous cartographions trois indicateurs par **MSOA** (*Middle Layer Super Output Area*, environ 8 000 habitants chacune) :
+
+| Indicateur | Variable | Source |
+|----|----|----|
+| Densité de population | `densite` (milliers d'hab./km²) | calculée |
+| Ménages en situation de privation | `perc_depr_households` (%) | recensement 2011 |
+| Plus de 60 ans touchant le *Pension Credit* | `perc_pensioncredit` (%) | DWP |
+
+Le *Pension Credit* est une allocation versée aux retraités à faibles revenus : c'est un indicateur de pauvreté des personnes âgées.
+
+::: callout-tip
+## Ce que vous saurez faire à la fin
+
+- Construire une carte avec **plusieurs couches** que l'on affiche ou masque
+- Proposer **plusieurs fonds de carte** au choix
+- Écrire une **fonction** pour éviter de répéter le même code
+- Ajouter une **légende par couche**, une **échelle**, une **mini-carte** et un bouton de retour
+- **Enregistrer** la carte dans un fichier HTML autonome
+:::
+
+```{r}
+#| label: setup
+
+library(leaflet)     # cartes interactives
+library(sf)          # données vectorielles
+library(dplyr)       # manipulation de données
+library(readr)       # lecture de CSV
+library(classInt)    # classes de Fisher-Jenks
+library(htmltools)   # texte HTML pour les étiquettes
+library(htmlwidgets) # enregistrer la carte
+
+# Un fond OpenStreetMap en niveaux de gris : on ajoute une classe CSS aux
+# tuiles, puis un filtre CSS qui les passe en gris (voir cartes_interactives.qmd)
+ajouter_osm_gris <- function(carte, group = NULL) {
+  carte |>
+    addTiles(group = group, options = tileOptions(className = "osm-gris")) |>
+    htmlwidgets::prependContent(htmltools::tags$style(
+      ".osm-gris { filter: grayscale(100%) brightness(1.05) contrast(0.85); }"))
+}
+```
+
+------------------------------------------------------------------------
+
+## Préparer les données {#sec-data}
+
+On joint les contours des MSOA aux données de privation, on calcule la densité, et on **reprojette en WGS 84** (EPSG:4326), indispensable pour une carte web.
+
+```{r}
+#| label: data
+
+msoa   <- read_sf("data/London/statistical-gis-boundaries-london/ESRI/MSOA_2011_London_gen_MHW.shp")
+depriv <- read_csv("data/London/Tables/depriv_data.csv", show_col_types = FALSE)
+
+londres <- msoa |>
+  left_join(depriv, by = c("MSOA11CD" = "msoacode")) |>
+  filter(!is.na(msoaname)) |>
+  mutate(
+    surface_km2 = as.numeric(st_area(geometry)) / 1e6,   # en British National Grid : des m²
+    densite     = round(population / surface_km2 / 1000, 1)   # milliers d'hab./km²
+  ) |>
+  st_simplify(dTolerance = 25, preserveTopology = TRUE) |>   # contours allégés (25 m)
+  st_transform(4326)
+
+# Les arrondissements (boroughs), pour se repérer
+boroughs <- read_sf("data/London/statistical-gis-boundaries-london/ESRI/London_Borough_Excluding_MHW.shp") |>
+  st_simplify(dTolerance = 25, preserveTopology = TRUE) |>
+  st_transform(4326)
+
+nrow(londres)
+summary(select(st_drop_geometry(londres), densite, perc_depr_households, perc_pensioncredit))
+```
+
+::: callout-tip
+## Pourquoi `st_simplify()` ?
+
+Chaque couche `addPolygons()` embarque toutes les coordonnées des polygones dans la page web, et notre carte en contient trois. On retire les détails de moins de 25 m, invisibles à l'écran : la page est beaucoup plus légère et la carte plus fluide. On simplifie en British National Grid, pour que la tolérance soit en mètres.
+:::
+
+::: callout-important
+## Calculer les surfaces **avant** de reprojeter
+
+La surface est calculée dans le SCR d'origine (British National Grid, en mètres), puis on passe en WGS 84 pour la carte. En faisant l'inverse, on calculerait des surfaces sur des degrés : `sf` sait le faire, mais c'est plus lent et inutile.
+:::
+
+------------------------------------------------------------------------
+
+## Les palettes {#sec-palettes}
+
+On crée une palette par indicateur, avec des classes de **Fisher-Jenks** (`classInt`) et une teinte différente pour chacun, afin que l'on sache toujours quel indicateur est affiché.
+
+```{r}
+#| label: palettes
+
+# Une petite fonction : bornes de Fisher-Jenks, arrondies
+bornes_jenks <- function(x, n = 6) {
+  round(classIntervals(x, n = n, style = "fisher")$brks, 1)
+}
+
+pal_dens <- colorBin("Greens",  domain = londres$densite,
+                     bins = bornes_jenks(londres$densite))
+pal_depr <- colorBin("Blues",   domain = londres$perc_depr_households,
+                     bins = bornes_jenks(londres$perc_depr_households))
+pal_pens <- colorBin("Oranges", domain = londres$perc_pensioncredit,
+                     bins = bornes_jenks(londres$perc_pensioncredit))
+```
+
+------------------------------------------------------------------------
+
+## Les étiquettes {#sec-labels}
+
+Une seule étiquette par MSOA, qui affiche **les trois indicateurs** quel que soit celui qui est cartographié : l'utilisateur peut ainsi comparer d'un coup d'œil. `sprintf()` insère les valeurs dans un modèle de texte (`%s` pour du texte, `%.1f` pour un nombre à une décimale).
+
+```{r}
+#| label: labels
+
+etiquettes <- sprintf(
+  "<strong>%s</strong><br/><em>%s</em><br/>
+   Densité : %.1f milliers d'hab./km²<br/>
+   Ménages en privation : %.1f %%<br/>
+   60 ans et plus au Pension Credit : %.1f %%",
+  londres$msoaname, londres$boroughname,
+  londres$densite, londres$perc_depr_households, londres$perc_pensioncredit
+) |>
+  lapply(HTML)
+
+etiquettes[[1]]
+```
+
+------------------------------------------------------------------------
+
+## Une fonction pour ajouter un indicateur {#sec-function}
+
+La version d'origine de cette carte répétait trois fois le même bloc `addPolygons()` de 20 lignes, en ne changeant que la variable, la palette et le nom du groupe. Quand on copie-colle du code, on finit toujours par oublier de modifier une ligne. On écrit plutôt une **fonction** :
+
+```{r}
+#| label: function
+
+ajouter_indicateur <- function(carte, variable, palette, groupe) {
+  carte |>
+    addPolygons(
+      fillColor   = palette(londres[[variable]]),
+      fillOpacity = 0.8,
+      color = "white", weight = 0.4,
+      group = groupe,
+      label = etiquettes,
+      labelOptions = labelOptions(textsize = "13px", direction = "auto"),
+      highlightOptions = highlightOptions(
+        weight = 3, color = "#333333", fillOpacity = 0.95, bringToFront = TRUE)
+    ) |>
+    addLegend(
+      pal = palette, values = londres[[variable]],
+      title = groupe, group = groupe,          # la légende suit sa couche
+      position = "bottomright", opacity = 0.8
+    )
+}
+```
+
+Le paramètre `group` est la clé : il relie une couche à sa légende et au panneau de contrôle des couches.
+
+------------------------------------------------------------------------
+
+## Assembler la carte {#sec-map}
+
+```{r}
+#| label: map
+
+groupes <- c("Densité (milliers d'hab./km²)",
+             "Ménages en privation (%)",
+             "60 ans et plus au Pension Credit (%)")
+
+carte_londres <- leaflet(londres) |>
+  # 1. Plusieurs fonds de carte ouverts, au choix
+  ajouter_osm_gris(group = "OSM gris") |>
+  addProviderTiles(providers$OpenStreetMap.Mapnik, group = "OpenStreetMap") |>
+  addProviderTiles(providers$OpenStreetMap.HOT,    group = "OSM Humanitaire") |>
+
+  # 2. Les trois indicateurs, grâce à notre fonction
+  ajouter_indicateur("densite",              pal_dens, groupes[1]) |>
+  ajouter_indicateur("perc_depr_households", pal_depr, groupes[2]) |>
+  ajouter_indicateur("perc_pensioncredit",   pal_pens, groupes[3]) |>
+
+  # 3. Les limites des boroughs, pour se repérer
+  addPolylines(data = boroughs, color = "#333333", weight = 1.2,
+               group = "Limites des boroughs") |>
+
+  # 4. Le panneau de contrôle des couches
+  addLayersControl(
+    baseGroups    = c("OSM gris", "OpenStreetMap", "OSM Humanitaire"),
+    overlayGroups = c(groupes, "Limites des boroughs"),
+    options = layersControlOptions(collapsed = FALSE)
+  ) |>
+  hideGroup(groupes[2:3]) |>      # au départ, seule la densité est visible
+
+  # 5. Les finitions
+  setView(lng = -0.118, lat = 51.51, zoom = 10) |>
+  addScaleBar(position = "bottomleft") |>
+  addMiniMap(tiles = providers$OpenStreetMap.Mapnik, toggleDisplay = TRUE,
+             position = "topleft") |>
+  addEasyButton(easyButton(
+    icon = "fa-home", title = "Revenir à la vue d'ensemble",
+    onClick = JS("function(btn, map){ map.setView([51.51, -0.118], 10); }")
+  ))
+
+carte_londres
+```
+
+Utilisez le panneau en haut à droite : les **boutons radio** choisissent le fond de carte (un seul à la fois), les **cases à cocher** affichent ou masquent les indicateurs. Chaque légende n'apparaît qu'avec sa couche.
+
+::: callout-tip
+## Une seule couche à la fois
+
+Si vous cochez deux indicateurs, le dernier coché recouvre l'autre. Pour imposer un seul indicateur à la fois, on peut placer les indicateurs dans `baseGroups` (boutons radio) au lieu de `overlayGroups`, et ne garder qu'un fond de carte. C'est un choix de conception : liberté d'explorer, ou simplicité de lecture ?
+:::
+
+------------------------------------------------------------------------
+
+## Enregistrer la carte {#sec-save}
+
+```{r}
+#| label: save
+#| eval: false
+
+saveWidget(carte_londres, "privation_londres.html",
+           selfcontained = TRUE, title = "Privation à Londres")
+```
+
+Le fichier obtenu s'ouvre dans n'importe quel navigateur, sans R : on peut l'envoyer par e-mail ou le publier sur un site web. Les tuiles du fond de carte, elles, sont chargées depuis Internet à l'ouverture.
+
+------------------------------------------------------------------------
+
+## Lire la carte {#sec-read}
+
+Quelques questions pour explorer la carte :
+
+- Où se concentrent les ménages en situation de privation ? Cette géographie ressemble-t-elle à celle de la densité ?
+- La pauvreté des personnes âgées (Pension Credit) suit-elle la même géographie que la privation des ménages ?
+- Changez de fond de carte : lequel rend la lecture des indicateurs la plus facile ? Pourquoi un fond clair et peu chargé convient-il mieux à une choroplèthe ?
+
+------------------------------------------------------------------------
+
+## À vous de jouer — Paris {#sec-exercise}
+
+::: callout-note
+## Une carte interactive de Paris
+
+Construisez une carte interactive de Paris avec les données du dossier `data/Paris/`.
+
+**Fichiers disponibles :**
+
+| Fichier | Description |
+|----|----|
+| `Polygons/arrondiss_lambert.shp` | Les 20 arrondissements (Lambert 93) |
+| `Tables/donnees_arrondissement_enrichi.csv` | Données socio-économiques par arrondissement |
+| `Points/velib-disponibilite-en-temps-reel.geojson` | Stations Vélib' (octobre 2022) |
+| `airbnb/listings.csv` | Annonces Airbnb (septembre 2022) |
+
+**Étapes :**
+
+1.  Joignez les données socio-économiques aux arrondissements (clé : `c_arinsee`) et cartographiez le **revenu médian** en choroplèthe interactive, avec une étiquette au survol et une légende.
+2.  Ajoutez les **stations Vélib'** de Paris en cercles proportionnels à leur capacité, avec un popup donnant le nom de la station et le nombre de vélos disponibles.
+3.  Calculez le **nombre d'annonces Airbnb par km²** dans chaque arrondissement (jointure spatiale) et ajoutez-le comme deuxième indicateur.
+4.  Assemblez le tout avec **trois fonds de carte ouverts** au choix, dont le Plan IGN, un panneau de contrôle des couches et une échelle, puis enregistrez la carte en HTML.
+
+**→ Corrigé : [Cartes interactives : Paris](cartes_interactives_Paris.qmd)**
+:::
+
+------------------------------------------------------------------------
+
+## Pour aller plus loin {#sec-links}
+
+- [Documentation du package `leaflet` pour R](https://rstudio.github.io/leaflet/) — en particulier la page sur les [choroplèthes](https://rstudio.github.io/leaflet/articles/choropleths.html)
+- [`leaflet.extras`](https://trafficonese.github.io/leaflet.extras/) : recherche d'adresse, plein écran, cartes de chaleur
+- [Leaflet (JavaScript)](https://leafletjs.com/) : la bibliothèque d'origine
+
+------------------------------------------------------------------------
+
+> **← Précédent : [Cartes interactives avec Leaflet](cartes_interactives.qmd)** **→ Corrigé : [Cartes interactives : Paris](cartes_interactives_Paris.qmd)**
+
+------------------------------------------------------------------------
+
+*Dr. Elisabetta Pietrostefani — Directrice Adjointe, Geographic Data Science Lab — Université de Liverpool \| Co-Directrice, [Imago : Data Service for Imagery](https://imago.ac.uk/) \| Chercheuse Associée, London School of Economics*

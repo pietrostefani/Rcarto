@@ -15,20 +15,29 @@ book:
         - simplefeatures.qmd
         - choropleths.qmd
         - crs.qmd
-        - raster.qmd
 
-    - part: "Section 2 — Géotraitement et Analyse Spatiale"
+    - part: "Section 2 — Raster"
+      chapters:
+        - raster.qmd
+        - raster_Liban.qmd
+
+    - part: "Section 3 — Géotraitement"
       chapters:
         - geoprocessing_Londres.qmd
-        - indices_topo.qmd
         - interpolation.qmd
+
+    - part: "Section 4 — Cartographie interactive"
+      chapters:
+        - cartes_interactives.qmd
+        - leaflet_Londres.qmd
 
     - part: "Réponses"
       chapters:
         - choropleths_France.qmd
+        - raster_Corse.qmd
         - geoprocessing_Paris.qmd
-        - indices_topo_Corse.qmd
         - interpolation_Paris.qmd
+        - cartes_interactives_Paris.qmd
 
   page-footer:
     left: |

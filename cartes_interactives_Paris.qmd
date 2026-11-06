@@ -1,0 +1,372 @@
+---
+title: "Cartes interactives : Paris"
+author: "Dr. Elisabetta Pietrostefani"
+date: today
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    toc-title: "Table des matières"
+    number-sections: true
+    code-fold: false
+    code-tools: true
+    theme: cosmo
+    highlight-style: github
+    fig-align: center
+execute:
+  warning: false
+  message: false
+  echo: true
+---
+
+::: callout-important
+## Corrigé — à consulter après avoir essayé par vous-mêmes
+
+Ce document contient les réponses complètes à l'exercice Paris posé à la fin de [Leaflet : privation à Londres](leaflet_Londres.qmd#sec-exercise). Essayez d'abord par vous-mêmes avant de consulter ce corrigé.
+:::
+
+```{r}
+#| label: setup
+
+library(leaflet)     # cartes interactives
+library(sf)          # données vectorielles
+library(dplyr)       # manipulation de données
+library(readr)       # lecture de CSV
+library(classInt)    # classes de Fisher-Jenks
+library(htmltools)   # texte HTML pour les étiquettes
+library(htmlwidgets) # enregistrer la carte
+
+# --- Fonds de carte IGN ----------------------------------------------------
+# Les tuiles IGN sont servies par la Géoplateforme (data.geopf.fr), sans clé.
+# Seuls le nom de la couche (LAYER) et le format d'image changent d'un fond
+# à l'autre : on écrit une fonction qui construit l'adresse des tuiles.
+# {z}, {x} et {y} sont remplacés par Leaflet : niveau de zoom, colonne, ligne.
+url_ign <- function(couche, format = "image/png") {
+  paste0("https://data.geopf.fr/wmts?REQUEST=GetTile&SERVICE=WMTS&VERSION=1.0.0",
+         "&STYLE=normal&TILEMATRIXSET=PM&FORMAT=", format,
+         "&LAYER=", couche,
+         "&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}")
+}
+url_plan_ign  <- url_ign("GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2")                # Plan IGN
+url_ortho_ign <- url_ign("ORTHOIMAGERY.ORTHOPHOTOS", format = "image/jpeg")  # photos aériennes
+
+# --- Fond OpenStreetMap gris -------------------------------------------------
+# addTiles() ajoute les tuiles OpenStreetMap (libres, sans clé).
+# className = "osm-gris" donne une étiquette CSS à ces tuiles seulement ;
+# la règle CSS ajoutée avec prependContent() les passe en niveaux de gris.
+# Les polygones et les cercles, eux, gardent leurs couleurs.
+ajouter_osm_gris <- function(carte, group = NULL) {
+  carte |>
+    addTiles(group = group, options = tileOptions(className = "osm-gris")) |>
+    htmlwidgets::prependContent(htmltools::tags$style(
+      ".osm-gris { filter: grayscale(100%) brightness(1.05) contrast(0.85); }"))
+}
+```
+
+------------------------------------------------------------------------
+
+## Exercice 1 — Le revenu médian par arrondissement {#sec-ex1}
+
+### Préparer les données
+
+Le fichier CSV contient des nombres écrits avec une virgule comme séparateur des milliers (`"16,055"`). On les nettoie avant la jointure, comme dans [Géotraitement — Paris](geoprocessing_Paris.qmd).
+
+```{r}
+#| label: ex1-data
+
+# 1. Les contours des 20 arrondissements (en Lambert 93, en mètres)
+arr <- read_sf("data/Paris/Polygons/arrondiss_lambert.shp")
+
+# 2. Les données socio-économiques par arrondissement
+#    Certaines colonnes sont lues comme du texte à cause des virgules ("16,055").
+#    Pour chaque colonne de texte :
+#      - gsub() retire les virgules ("16,055" -> "16055") ;
+#      - si le résultat ne contient que des chiffres (et un point), on le
+#        convertit en nombre ; sinon (ex. "1er Ardt"), on garde le texte.
+donnees <- read.csv("data/Paris/Tables/donnees_arrondissement_enrichi.csv") |>
+  mutate(across(where(is.character), ~ {
+    x <- gsub(",", "", .x)
+    ifelse(grepl("^-?[0-9.]+$", x), as.numeric(x), .x)
+  }))
+
+# 3. Jointure attributaire : on ajoute les colonnes de 'donnees' aux polygones,
+#    en faisant correspondre le code INSEE de l'arrondissement (c_arinsee)
+arr <- arr |>
+  left_join(donnees, by = c("c_arinsee" = "c_arinsee"))
+
+# 4. Vérification : quelques colonnes, sans la géométrie (plus lisible)
+arr |>
+  st_drop_geometry() |>
+  select(l_aroff, revenu_median, prix_m2_appart, taux_chomage) |>
+  head()
+```
+
+::: callout-important
+## Rappel : passer en WGS 84
+
+Les arrondissements sont en **Lambert 93**. On garde cette version (`arr`) pour les calculs de surface et la jointure spatiale de l'exercice 3, et on crée une copie en **WGS 84** pour la carte web.
+:::
+
+```{r}
+#| label: ex1-wgs
+
+# Copie en WGS 84 (longitude / latitude), le système des cartes web
+arr_wgs <- st_transform(arr, 4326)
+```
+
+### La carte
+
+```{r}
+#| label: ex1-map
+
+# 1. La palette : une fonction qui transforme un revenu en couleur.
+#    - colorBin() : des classes dont on fixe les bornes ;
+#    - les bornes sont calculées par la méthode de Fisher-Jenks (5 classes) ;
+#    - "YlGnBu" : palette séquentielle jaune -> vert -> bleu (ColorBrewer).
+pal_revenu <- colorBin("YlGnBu", domain = arr_wgs$revenu_median,
+                       bins = classIntervals(arr_wgs$revenu_median, n = 5,
+                                             style = "fisher")$brks)
+
+# 2. Les étiquettes affichées au survol, en HTML :
+#    - sprintf() insère les valeurs dans le modèle (%s = texte) ;
+#    - <strong> = gras, <br/> = retour à la ligne ;
+#    - format(big.mark = " ") écrit 3 890 au lieu de 3890 ;
+#    - lapply(HTML) indique à leaflet que c'est du HTML, pas du texte brut.
+etiq_revenu <- sprintf("<strong>%s</strong><br/>Revenu médian : %s € / mois",
+                       arr_wgs$l_aroff,
+                       format(arr_wgs$revenu_median, big.mark = " ")) |>
+  lapply(HTML)
+
+# 3. La carte, construite couche par couche
+leaflet(arr_wgs) |>
+  ajouter_osm_gris() |>                                # fond de carte gris
+  addPolygons(
+    fillColor   = ~pal_revenu(revenu_median),          # couleur selon le revenu (~ = colonne)
+    fillOpacity = 0.8,                                 # légère transparence
+    color = "white", weight = 1,                       # contours blancs fins
+    label = etiq_revenu,                               # info-bulle au survol
+    highlightOptions = highlightOptions(               # mise en évidence au survol :
+      weight = 3, color = "#333333",                   #   contour plus épais et foncé
+      fillOpacity = 0.95, bringToFront = TRUE)         #   couleur pleine, polygone au premier plan
+  ) |>
+  addLegend(pal = pal_revenu, values = ~revenu_median, opacity = 0.8,
+            title = "Revenu médian (€ / mois)", position = "bottomright",
+            labFormat = labelFormat(big.mark = " ", digits = 0))  # 3 890, sans décimale
+```
+
+Le contraste est net entre le centre et l'ouest (1^er^, 6^e^, 7^e^, 8^e^, 16^e^ arrondissements) et le nord-est (18^e^, 19^e^, 20^e^).
+
+------------------------------------------------------------------------
+
+## Exercice 2 — Les stations Vélib' {#sec-ex2}
+
+Le fichier contient aussi des stations des communes voisines : on ne garde que celles de Paris. Il est déjà en WGS 84 (c'est le format GeoJSON standard).
+
+```{r}
+#| label: ex2-data
+
+# Lecture du GeoJSON : read_sf() lit ce format comme un shapefile.
+# On ne garde que les stations situées dans Paris (pas les communes voisines).
+velib <- read_sf("data/Paris/Points/velib-disponibilite-en-temps-reel.geojson") |>
+  filter(nom_arrondissement_communes == "Paris")
+
+nrow(velib)            # nombre de stations
+st_crs(velib)$input    # déjà en WGS 84 : pas besoin de reprojeter
+```
+
+```{r}
+#| label: ex2-map
+
+leaflet(velib) |>
+  ajouter_osm_gris() |>
+  addCircleMarkers(
+    # Taille du cercle : on prend la racine carrée de la capacité pour que la
+    # SURFACE du cercle (et non son rayon) soit proportionnelle au nombre de bornes.
+    # * 0.6 réduit la taille générale pour limiter les chevauchements.
+    radius = ~sqrt(capacity) * 0.6,
+    color = "white", weight = 0.5,                # fin contour blanc autour des cercles
+    fillColor = "#6E9B3E", fillOpacity = 0.8,     # vert Vélib'
+    label  = ~name,                               # au survol : le nom de la station
+    # Au clic : une petite fiche en HTML, assemblée avec paste0()
+    popup  = ~paste0("<b>", name, "</b><br>",
+                     numbikesavailable, " vélos disponibles ",
+                     "(", mechanical, " mécaniques, ", ebike, " électriques)<br>",
+                     capacity, " bornes")
+  )
+```
+
+Les données datent d'octobre 2022. Pour une carte vraiment « en temps réel », on interrogerait directement l'API de la [plateforme open data de Paris](https://opendata.paris.fr/explore/dataset/velib-disponibilite-en-temps-reel/api/), comme pour les vélos de Londres dans [Cartes interactives avec Leaflet](cartes_interactives.qmd#sec-api).
+
+------------------------------------------------------------------------
+
+## Exercice 3 — La densité d'annonces Airbnb {#sec-ex3}
+
+Le fichier contient plus de 56 000 annonces : trop pour afficher chaque point. On les **agrège** par arrondissement avec une jointure spatiale, puis on rapporte leur nombre à la surface.
+
+```{r}
+#| label: ex3-data
+
+# 1. Les annonces : un simple tableau avec des colonnes longitude et latitude.
+#    st_as_sf() le transforme en objet spatial (des points) ;
+#    crs = 4326 indique que les coordonnées sont en WGS 84 (degrés).
+#    On reprojette ensuite dans le même SCR que les arrondissements (Lambert 93) :
+#    une jointure spatiale exige que les deux couches soient dans le même SCR.
+airbnb <- read_csv("data/Paris/airbnb/listings.csv", show_col_types = FALSE) |>
+  st_as_sf(coords = c("longitude", "latitude"), crs = 4326) |>
+  st_transform(st_crs(arr))
+
+nrow(airbnb)   # nombre d'annonces
+
+# 2. Jointure spatiale : st_join() ajoute à chaque annonce le code de
+#    l'arrondissement dans lequel elle se trouve (point dans polygone).
+#    On retire ensuite la géométrie et on compte les annonces par arrondissement.
+airbnb_arr <- st_join(airbnb, arr["c_arinsee"]) |>
+  st_drop_geometry() |>
+  count(c_arinsee, name = "n_airbnb")
+
+# 3. On ajoute ce comptage aux arrondissements et on calcule une DENSITÉ :
+#    st_area() donne la surface en m² (Lambert 93), / 1e6 la convertit en km².
+arr <- arr |>
+  left_join(airbnb_arr, by = "c_arinsee") |>
+  mutate(surface_km2    = as.numeric(st_area(geometry)) / 1e6,
+         airbnb_par_km2 = round(n_airbnb / surface_km2))
+
+# 4. On met à jour la copie en WGS 84 pour la carte web
+arr_wgs <- st_transform(arr, 4326)
+
+# 5. Les arrondissements où les annonces sont les plus denses
+arr |>
+  st_drop_geometry() |>
+  select(l_aroff, n_airbnb, airbnb_par_km2) |>
+  arrange(desc(airbnb_par_km2)) |>
+  head()
+```
+
+Pourquoi une densité plutôt que le nombre brut ? Pour la même raison que dans les cartes choroplèthes : en nombre brut, ce sont de grands arrondissements comme le 18^e^ ou le 15^e^ qui comptent le plus d'annonces. Rapporté à la surface, ce sont les petits arrondissements centraux (3^e^, 2^e^) qui ressortent.
+
+------------------------------------------------------------------------
+
+## Exercice 4 — Assembler la carte {#sec-ex4}
+
+On réunit les trois couches, avec des fonds de carte ouverts au choix, un panneau de contrôle et une échelle.
+
+```{r}
+#| label: ex4-map
+
+# 1. Une palette pour le deuxième indicateur (rose -> violet, "RdPu"),
+#    différente de celle du revenu pour ne pas confondre les deux couches
+pal_airbnb <- colorBin("RdPu", domain = arr_wgs$airbnb_par_km2,
+                       bins = classIntervals(arr_wgs$airbnb_par_km2, n = 5,
+                                             style = "fisher")$brks)
+
+# 2. Une seule étiquette pour les deux couches, avec les deux indicateurs :
+#    quelle que soit la couche affichée, on lit les deux valeurs au survol.
+etiq_arr <- sprintf(
+  "<strong>%s</strong><br/>Revenu médian : %s € / mois<br/>Annonces Airbnb : %s par km²",
+  arr_wgs$l_aroff,
+  format(arr_wgs$revenu_median, big.mark = " "),
+  format(arr_wgs$airbnb_par_km2, big.mark = " ")
+) |>
+  lapply(HTML)
+
+# 3. Les options de mise en évidence, définies une fois et réutilisées
+surbrillance <- highlightOptions(weight = 3, color = "#333333",
+                                 fillOpacity = 0.95, bringToFront = TRUE)
+
+# 4. La carte. On part d'une carte vide (leaflet() sans données) et on
+#    indique les données couche par couche avec 'data = '.
+#    Le paramètre 'group' donne un nom à chaque couche : c'est ce nom qui
+#    apparaît dans le panneau de contrôle et qui relie une légende à sa couche.
+carte_paris <- leaflet() |>
+
+  # --- Fonds de carte (un seul visible à la fois) ---
+  ajouter_osm_gris(group = "OSM gris") |>
+  addTiles(urlTemplate = url_plan_ign,  attribution = "© IGN – Géoplateforme",
+           group = "Plan IGN") |>
+  addTiles(urlTemplate = url_ortho_ign, attribution = "© IGN – Géoplateforme",
+           group = "Photographies aériennes IGN") |>
+
+  # --- Indicateur 1 : revenu médian (polygones + légende du même groupe) ---
+  addPolygons(data = arr_wgs, group = "Revenu médian",
+              fillColor = ~pal_revenu(revenu_median), fillOpacity = 0.75,
+              color = "white", weight = 1, label = etiq_arr,
+              highlightOptions = surbrillance) |>
+  addLegend(data = arr_wgs, pal = pal_revenu, values = ~revenu_median,
+            title = "Revenu médian (€ / mois)", group = "Revenu médian",
+            position = "bottomright", opacity = 0.8,
+            labFormat = labelFormat(big.mark = " ", digits = 0)) |>
+
+  # --- Indicateur 2 : densité d'annonces Airbnb ---
+  addPolygons(data = arr_wgs, group = "Annonces Airbnb",
+              fillColor = ~pal_airbnb(airbnb_par_km2), fillOpacity = 0.75,
+              color = "white", weight = 1, label = etiq_arr,
+              highlightOptions = surbrillance) |>
+  addLegend(data = arr_wgs, pal = pal_airbnb, values = ~airbnb_par_km2,
+            title = "Annonces Airbnb / km²", group = "Annonces Airbnb",
+            position = "bottomright", opacity = 0.8,
+            labFormat = labelFormat(big.mark = " ", digits = 0)) |>
+
+  # --- Couche de points : les stations Vélib' (gris foncé, au-dessus) ---
+  addCircleMarkers(data = velib, group = "Stations Vélib'",
+                   radius = ~sqrt(capacity) * 0.8, stroke = FALSE,
+                   fillColor = "#2F4F4F", fillOpacity = 0.6,
+                   label = ~name,
+                   popup = ~paste0("<b>", name, "</b><br>",
+                                   numbikesavailable, " vélos disponibles / ",
+                                   capacity, " bornes")) |>
+
+  # --- Le panneau de contrôle des couches (en haut à droite) ---
+  #     baseGroups    : boutons radio, un seul fond de carte à la fois
+  #     overlayGroups : cases à cocher, on superpose les couches de données
+  addLayersControl(
+    baseGroups    = c("OSM gris", "Plan IGN", "Photographies aériennes IGN"),
+    overlayGroups = c("Revenu médian", "Annonces Airbnb", "Stations Vélib'"),
+    options = layersControlOptions(collapsed = FALSE)   # panneau toujours ouvert
+  ) |>
+
+  # --- Au départ, seul le revenu médian est affiché ---
+  hideGroup(c("Annonces Airbnb", "Stations Vélib'")) |>
+
+  # --- Barre d'échelle en bas à gauche ---
+  addScaleBar(position = "bottomleft")
+
+carte_paris
+```
+
+::: callout-tip
+## Choix de conception
+
+- Le fond **OSM gris** est proposé par défaut : minimaliste, il laisse toute la place aux couleurs des indicateurs.
+- Le **Plan IGN** est la référence cartographique française : utile pour se repérer (noms de rues, équipements), mais plus chargé.
+- Les **photographies aériennes** sont utiles pour reconnaître un lieu, mais peu lisibles sous des aplats de couleur : décochez les indicateurs pour les voir.
+- Les deux indicateurs partagent **la même étiquette** : en survolant un arrondissement, on lit les deux valeurs, quel que soit l'indicateur affiché.
+:::
+
+### Enregistrer la carte
+
+```{r}
+#| label: ex4-save
+#| eval: false
+
+# selfcontained = TRUE : un seul fichier HTML, qui contient tout (sauf les
+# tuiles, chargées depuis Internet à l'ouverture). Il s'ouvre dans n'importe
+# quel navigateur, sans R, et peut être envoyé par e-mail.
+saveWidget(carte_paris, "carte_paris.html",
+           selfcontained = TRUE, title = "Paris : revenus, Airbnb et Vélib'")
+```
+
+------------------------------------------------------------------------
+
+## À discuter {#sec-discuss}
+
+- Comparez les couches *Revenu médian* et *Annonces Airbnb* : les annonces sont-elles concentrées dans les arrondissements les plus aisés ? Qu'est-ce qui pourrait expliquer leur géographie (tourisme, monuments, taille des logements) ?
+- Les stations Vélib' sont-elles réparties de façon homogène ? Où sont les plus grandes stations ?
+- Avec seulement 20 arrondissements, une carte interactive apporte-t-elle beaucoup par rapport à une carte statique ? Pour quelles données l'interactivité devient-elle indispensable ?
+
+------------------------------------------------------------------------
+
+> **← Retour au cours : [Leaflet : privation à Londres](leaflet_Londres.qmd)**
+
+------------------------------------------------------------------------
+
+*Dr. Elisabetta Pietrostefani — Directrice Adjointe, Geographic Data Science Lab — Université de Liverpool \| Co-Directrice, [Imago : Data Service for Imagery](https://imago.ac.uk/) \| Chercheuse Associée, London School of Economics*

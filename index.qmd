@@ -16,7 +16,7 @@ format:
 
 Ce site rassemble les supports de la formation **R pour la Cartographie et les SIG**.
 
-La formation vous permettra d'**analyser et visualiser des données géographiques avec R**, en passant des fondamentaux — objets spatiaux, choroplèthes, projections, raster — jusqu'au géotraitement avancé et à l'interpolation spatiale. Tout le cours est construit autour de `ggplot2` comme outil de visualisation unique, et de données réelles : transactions immobilières à Londres, annonces Airbnb à Paris, MNT du Liban et de la Corse.
+La formation vous permettra d'**analyser et visualiser des données géographiques avec R**, en passant des fondamentaux — objets spatiaux, choroplèthes, projections, raster — jusqu'au géotraitement avancé, à l'interpolation spatiale et aux cartes interactives. Les cartes statiques sont construites avec `ggplot2`, les cartes interactives avec `leaflet`, à partir de données réelles : transactions immobilières à Londres, annonces Airbnb à Paris, MNT du Liban et de la Corse.
 
 ------------------------------------------------------------------------
 
@@ -42,13 +42,21 @@ Classification (Jenks, quantiles, écart-type), palettes séquentielles, diverge
 
 SCR géographiques vs projetés, reprojection, comparaison de projections.
 
+### Raster
+
 [**Données Raster**](raster.qmd)
 
 Introduction aux MNT, packages `terra` et `stars`, `geom_spatraster()`.
+
+[**Relief du Liban**](raster_Liban.qmd)
+
+Reprojection, recadrage, pente, reclassification, extraction et statistiques zonales — Liban.
+
+*Exercice → [Corse](raster_Corse.qmd)*
 :::
 
 ::: g-col-6
-### Géotraitement et Analyse Spatiale
+### Géotraitement
 
 [**Géotraitement — Londres**](geoprocessing_Londres.qmd)
 
@@ -56,17 +64,23 @@ Jointure spatiale, zones tampons, intersection, distance, voisinage — données
 
 *Exercice → [Paris Airbnb](geoprocessing_Paris.qmd)*
 
-[**Indices Topographiques**](indices_topo.qmd)
-
-Recadrage, pente, reclassification raster — Liban comme démonstration.
-
-*Exercice → [Corse](indices_topo_Corse.qmd)*
-
 [**Interpolation Spatiale**](interpolation.qmd)
 
 IDW (Pondération Inverse à la Distance) et heatmaps — prix immobiliers à Londres.
 
 *Exercice → [Paris Airbnb](interpolation_Paris.qmd)*
+
+### Cartographie interactive
+
+[**Cartes interactives avec Leaflet**](cartes_interactives.qmd)
+
+Fonds de carte ouverts, marqueurs, choroplèthes interactives, données d'API — package `leaflet`.
+
+[**Leaflet : privation à Londres**](leaflet_Londres.qmd)
+
+Une carte à plusieurs couches et fonds de carte, avec légendes, échelle et mini-carte.
+
+*Exercice → [Paris](cartes_interactives_Paris.qmd)*
 :::
 :::::
 
@@ -115,6 +129,8 @@ install.packages(c(
 
   # Cartes interactives
   "leaflet",
+  "htmlwidgets",        # enregistrer une carte interactive en HTML
+  "jsonlite",           # lire des données d'API (JSON)
 
   # Cartographie thématique
   "mapsf"

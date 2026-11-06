@@ -11,7 +11,6 @@ format:
     code-fold: true
     theme: cosmo
     highlight-style: github
-    embed-resources: true
     fig-align: center
 execute:
   warning: false
@@ -440,24 +439,36 @@ ma_variable_classee <- cut(mon_vecteur,
 
 ## Structure du cours {#sec-structure}
 
-Ce cours est organisé en deux grandes sections, chacune accompagnée de ses corrigés.
+Ce cours est organisé en quatre sections, accompagnées de leurs corrigés.
 
 **Section 1 — Les fondamentaux**
 
-| Chapitre | Contenu |
-|----|----|
-| [Objets spatiaux](simplefeatures.qmd) | Types géométriques, objets `sf`, premières cartes |
-| [Choroplèthes](choropleths.qmd) | Classification, palettes, méthodes de discrétisation |
-| [Systèmes de coordonnées](crs.qmd) | SCR, projections, reprojection |
-| [Données raster](raster.qmd) | Introduction aux MNT, packages `terra` et `stars` |
+| Chapitre | Contenu | Corrigé |
+|----|----|----|
+| [Objets spatiaux](simplefeatures.qmd) | Types géométriques, objets `sf`, premières cartes |  |
+| [Choroplèthes](choropleths.qmd) | Classification, palettes, méthodes de discrétisation | [France](choropleths_France.qmd) |
+| [Systèmes de coordonnées](crs.qmd) | SCR, projections, reprojection |  |
 
-**Section 2 — Géotraitement et analyse spatiale**
+**Section 2 — Raster**
+
+| Chapitre | Contenu | Corrigé |
+|----|----|----|
+| [Données raster](raster.qmd) | Introduction aux MNT, packages `terra` et `stars` |  |
+| [Relief du Liban](raster_Liban.qmd) | Reprojection, recadrage, pente, reclassification, extraction, statistiques zonales | [Corse](raster_Corse.qmd) |
+
+**Section 3 — Géotraitement**
 
 | Chapitre | Contenu | Corrigé |
 |----|----|----|
 | [Géotraitement — Londres](geoprocessing_Londres.qmd) | Jointures spatiales, zones tampons, distance | [Paris](geoprocessing_Paris.qmd) |
-| [Indices topographiques](indices_topo.qmd) | Pente, reclassification, extraction — Liban | [Corse](indices_topo_Corse.qmd) |
 | [Interpolation spatiale](interpolation.qmd) | IDW, heatmaps — Londres | [Paris Airbnb](interpolation_Paris.qmd) |
+
+**Section 4 — Cartographie interactive**
+
+| Chapitre | Contenu | Corrigé |
+|----|----|----|
+| [Cartes interactives avec Leaflet](cartes_interactives.qmd) | Fonds de carte ouverts, marqueurs, choroplèthes interactives, API |  |
+| [Leaflet : privation à Londres](leaflet_Londres.qmd) | Carte à plusieurs couches, légendes, contrôle des couches | [Paris](cartes_interactives_Paris.qmd) |
 
 ------------------------------------------------------------------------
 

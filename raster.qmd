@@ -12,7 +12,6 @@ format:
     code-tools: true
     theme: cosmo
     highlight-style: github
-    embed-resources: true
     fig-align: center
     fig-width: 8
     fig-height: 6
@@ -122,18 +121,18 @@ Les **données de lumières nocturnes** (*nightlights*) en sont un exemple parla
 
 **Modèles Numériques de Terrain (MNT)**
 
-Chaque pixel vaut l'**altitude au-dessus du niveau de la mer** à cet endroit. Les MNT sont la matière première de l'analyse topographique — ils servent à calculer la pente, l'exposition, la courbure, les bassins versants, les zones inondables, et bien d'autres indices. Le chapitre suivant, [Indices Topographiques](indices_topo.qmd), couvre ces opérations en détail et explique comment obtenir des données d'altitude pour n'importe quelle zone d'étude.
+Chaque pixel vaut l'**altitude au-dessus du niveau de la mer** à cet endroit. Les MNT sont la matière première de l'analyse topographique — ils servent à calculer la pente, l'exposition, la courbure, les bassins versants, les zones inondables, et bien d'autres indices. Le chapitre suivant, [Relief du Liban](raster_Liban.qmd), couvre ces opérations en détail et explique comment obtenir des données d'altitude pour n'importe quelle zone d'étude.
 
 ::: callout-note
 ## Des MNT aux produits dérivés
 
 À partir d'un seul MNT, on peut calculer :
 
--   **Pente** (`terrain(v = "slope")`) — inclinaison du terrain en degrés
--   **Exposition** (`terrain(v = "aspect")`) — orientation des versants (N, S, E, O)
--   **Courbure** — concavité/convexité de la surface
--   **TRI** (*Terrain Ruggedness Index*) — rugosité topographique
--   **Ombrage** (*hillshade*) — effet d'éclairage directionnel pour la visualisation
+- **Pente** (`terrain(v = "slope")`) — inclinaison du terrain en degrés
+- **Exposition** (`terrain(v = "aspect")`) — orientation des versants (N, S, E, O)
+- **Courbure** — concavité/convexité de la surface
+- **TRI** (*Terrain Ruggedness Index*) — rugosité topographique
+- **Ombrage** (*hillshade*) — effet d'éclairage directionnel pour la visualisation
 :::
 
 **Images multispectrales**
@@ -164,13 +163,13 @@ La **résolution temporelle** — fréquence de revisite du capteur — est tout
 
 ### Où trouver des données raster libres
 
--   [USGS Earth Explorer](https://earthexplorer.usgs.gov/) — Landsat, MODIS et autres archives NASA
--   [NASA Earthdata Search](https://search.earthdata.nasa.gov/) — catalogue complet d'observation de la Terre
--   [Copernicus Open Access Hub](https://scihub.copernicus.eu/) — imagerie Sentinel-1, 2, 3, 5P (ESA)
--   [AppEEARS (LP DAAC)](https://lpdaacsvc.cr.usgs.gov/appeears/) — extraction facilitée des produits terrestres NASA
--   [OpenTopography](https://opentopography.org/) — MNT haute résolution (LiDAR, SRTM, ALOS)
+- [USGS Earth Explorer](https://earthexplorer.usgs.gov/) — Landsat, MODIS et autres archives NASA
+- [NASA Earthdata Search](https://search.earthdata.nasa.gov/) — catalogue complet d'observation de la Terre
+- [Copernicus Open Access Hub](https://scihub.copernicus.eu/) — imagerie Sentinel-1, 2, 3, 5P (ESA)
+- [AppEEARS (LP DAAC)](https://lpdaacsvc.cr.usgs.gov/appeears/) — extraction facilitée des produits terrestres NASA
+- [OpenTopography](https://opentopography.org/) — MNT haute résolution (LiDAR, SRTM, ALOS)
 
-Pour les sources spécifiques aux modèles d'altitude (NASA Earthdata, RGE ALTI® IGN, NextGIS, `elevatr`), voir [Indices Topographiques → Obtenir des données d'altitude](indices_topo.qmd#sec-dem-sources).
+Pour les sources spécifiques aux modèles d'altitude (NASA Earthdata, RGE ALTI® IGN, NextGIS, `elevatr`), voir [Relief du Liban → Obtenir des données d'altitude](raster_Liban.qmd#sec-dem-sources).
 
 ------------------------------------------------------------------------
 
@@ -460,15 +459,15 @@ ggplot() +
 
 ## Liens utiles {#sec-links}
 
--   [Geocomputation with R — Ch. 2 : Raster data](https://geocompr.robinlovelace.net/spatial-class.html#raster-data)
--   [terra documentation](https://rspatial.org/terra/)
--   [stars documentation](https://r-spatial.github.io/stars/)
--   [tidyterra](https://dieghernan.github.io/tidyterra/) — intégration terra + ggplot2
--   [USGS Landsat](https://www.usgs.gov/landsat-missions) — source des images Landsat
+- [Geocomputation with R — Ch. 2 : Raster data](https://geocompr.robinlovelace.net/spatial-class.html#raster-data)
+- [terra documentation](https://rspatial.org/terra/)
+- [stars documentation](https://r-spatial.github.io/stars/)
+- [tidyterra](https://dieghernan.github.io/tidyterra/) — intégration terra + ggplot2
+- [USGS Landsat](https://www.usgs.gov/landsat-missions) — source des images Landsat
 
 ------------------------------------------------------------------------
 
-> **← Précédent : [Systèmes de Coordonnées de Référence](1_2_crs.qmd)** **→ Suivant : [Choroplèthes et Classification](choropleths.qmd)**
+> **← Précédent : [Systèmes de Coordonnées de Référence](crs.qmd)** **→ Suivant : [Relief du Liban](raster_Liban.qmd)**
 
 ------------------------------------------------------------------------
 

@@ -12,7 +12,6 @@ format:
     code-tools: true
     theme: cosmo
     highlight-style: github
-    embed-resources: true
     fig-align: center
     fig-width: 8
     fig-height: 6
@@ -26,10 +25,10 @@ execute:
 
 R est un environnement open source **conçu pour l'analyse de données et les graphiques**, qui s'exécute sur toutes les plateformes. Choisir R pour la cartographie, c'est réunir dans un seul outil :
 
--   la **manipulation des données** (nettoyage, jointures, agrégation)
--   l'**analyse statistique** (modèles, tests)
--   la **visualisation** (cartes statiques, interactives, graphiques)
--   la **reproductibilité** (scripts, Quarto, Git)
+- la **manipulation des données** (nettoyage, jointures, agrégation)
+- l'**analyse statistique** (modèles, tests)
+- la **visualisation** (cartes statiques, interactives, graphiques)
+- la **reproductibilité** (scripts, Quarto, Git)
 
 Contrairement aux logiciels SIG à interface graphique (QGIS, ArcGIS), R encourage une approche **en ligne de commande** qui rend chaque étape de l'analyse traçable et reproductible.
 
@@ -86,7 +85,7 @@ popup <- c("Clémence", "Baptiste", "Nathalie", "Daphné",
            "Fannie", "Gabrielle", "Yann", "Cédric", "Soilihi")
 
 leaflet() |>
-  addProviderTiles("NASAGIBS.ViirsEarthAtNight2012") |>
+  addTiles() |>   # fond OpenStreetMap, libre et sans clé
   addMarkers(
     lng = c(-1.5536, -0.5792, 5.4474, -4.4861, -2.0257,
              3.0870,  2.3522,  4.4861,  2.0257),
@@ -518,14 +517,14 @@ ggplot(districts,
 
 ## Liens utiles {#sec-links}
 
--   [Geocomputation with R](https://geocompr.robinlovelace.net) — référence principale
--   [r-spatial.org](https://r-spatial.org/book/03-Geometries.html) — géométries sf
--   [sf package documentation](https://r-spatial.github.io/sf/)
--   [ggplot2 + sf](https://ggplot2.tidyverse.org/reference/ggsf.html)
+- [Geocomputation with R](https://geocompr.robinlovelace.net) — référence principale
+- [r-spatial.org](https://r-spatial.org/book/03-Geometries.html) — géométries sf
+- [sf package documentation](https://r-spatial.github.io/sf/)
+- [ggplot2 + sf](https://ggplot2.tidyverse.org/reference/ggsf.html)
 
 ------------------------------------------------------------------------
 
-> **← Introduction : [Pourquoi les SIG ?](introduction.qmd)** **→ Suite : [Systèmes de Coordonnées et Rasters](1_2_R_pourlacartographie.qmd)**
+> **← Précédent : [Pourquoi les SIG ?](introduction.qmd)** **→ Suivant : [Choroplèthes](choropleths.qmd)**
 
 ------------------------------------------------------------------------
 
