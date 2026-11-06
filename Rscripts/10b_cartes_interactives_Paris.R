@@ -5,7 +5,7 @@
 # Une carte interactive de Paris avec :
 #   1. le revenu médian par arrondissement (choroplèthe interactive)
 #   2. les stations Vélib' (cercles proportionnels)
-#   3. la densité d'annonces Airbnb par arrondissement (jointure spatiale)
+#   3. le prix moyen des annonces Airbnb par IRIS (jointure spatiale)
 #   4. le tout assemblé, avec des fonds de carte ouverts (OpenStreetMap, IGN)
 #
 # Avant de commencer : ouvrez le projet (fichier .Rproj). Tous les chemins
@@ -147,62 +147,98 @@ leaflet(velib) |>
     popup  = ~paste0("<b>", name, "</b><br>",
                      numbikesavailable, " vélos disponibles ",
                      "(", mechanical, " mécaniques, ", ebike, " électriques)<br>",
-                     capacity, " bornes")
+                     capacity, " bornes"),
+    # Regroupement (comme pour les vélos de Londres) : quand on dézoome, les
+    # stations proches fusionnent en une bulle qui affiche leur NOMBRE de stations
+    # (pas de vélos) ; en zoomant, elles se séparent.
+    clusterOptions = markerClusterOptions()
   )
 
-# ---- Exercice 3 — La densité d'annonces Airbnb -------------------------
+# ---- Exercice 3 — Le prix moyen des annonces Airbnb par IRIS -----------
+#
+# Plus de 56 000 annonces : trop pour afficher chaque point. On les AGRÈGE par
+# IRIS, le petit quartier statistique de l'INSEE (environ 2 000 habitants,
+# un peu moins de 1 000 IRIS à Paris), et on calcule le prix moyen par nuit.
 
-# 1. Les annonces : un simple tableau avec des colonnes longitude et latitude.
+# 1. Les IRIS. Le fichier couvre toute l'Île-de-France : on garde Paris
+#    (dep == 75), on passe en Lambert 93 comme les autres couches, et on
+#    simplifie un peu les contours (10 m) pour alléger la carte web.
+iris <- read_sf("data/Paris/Polygons/iris.shp") |>
+  filter(dep == 75) |>
+  st_transform(2154) |>
+  st_simplify(dTolerance = 10, preserveTopology = TRUE) |>
+  select(code_iris, nom_iris, nom_com)
+
+nrow(iris)   # nombre d'IRIS à Paris
+
+# 2. Les annonces : un simple tableau avec des colonnes longitude et latitude.
 #    st_as_sf() le transforme en objet spatial (des points) ;
 #    crs = 4326 indique que les coordonnées sont en WGS 84 (degrés).
-#    On reprojette ensuite dans le même SCR que les arrondissements (Lambert 93) :
+#    On reprojette ensuite dans le même SCR que les IRIS (Lambert 93) :
 #    une jointure spatiale exige que les deux couches soient dans le même SCR.
 airbnb <- read_csv("data/Paris/airbnb/listings.csv", show_col_types = FALSE) |>
   st_as_sf(coords = c("longitude", "latitude"), crs = 4326) |>
-  st_transform(st_crs(arr))
+  st_transform(st_crs(iris))
 
 nrow(airbnb)   # nombre d'annonces
+summary(airbnb$price)   # attention aux valeurs extrêmes !
 
-# 2. Jointure spatiale : st_join() ajoute à chaque annonce le code de
-#    l'arrondissement dans lequel elle se trouve (point dans polygone).
-#    On retire ensuite la géométrie et on compte les annonces par arrondissement.
-airbnb_arr <- st_join(airbnb, arr["c_arinsee"]) |>
+# 3. Les prix contiennent des valeurs aberrantes (0 €, plus de 10 000 € la nuit)
+#    qui fausseraient une moyenne. On garde les annonces entre 10 et 1 000 €.
+airbnb <- airbnb |> filter(price >= 10, price <= 1000)
+
+# 4. Jointure spatiale : st_join() ajoute à chaque annonce le code de l'IRIS
+#    dans lequel elle se trouve (point dans polygone). On retire la géométrie,
+#    puis on calcule, pour chaque IRIS, le nombre d'annonces et le prix moyen.
+airbnb_iris <- st_join(airbnb, iris["code_iris"]) |>
   st_drop_geometry() |>
-  count(c_arinsee, name = "n_airbnb")
+  group_by(code_iris) |>
+  summarise(n_airbnb   = n(),
+            prix_moyen = round(mean(price)))
 
-# 3. On ajoute ce comptage aux arrondissements et on calcule une DENSITÉ :
-#    st_area() donne la surface en m² (Lambert 93), / 1e6 la convertit en km².
-arr <- arr |>
-  left_join(airbnb_arr, by = "c_arinsee") |>
-  mutate(surface_km2    = as.numeric(st_area(geometry)) / 1e6,
-         airbnb_par_km2 = round(n_airbnb / surface_km2))
+# 5. On ajoute ces résultats aux IRIS. Une moyenne calculée sur 2 ou 3
+#    annonces n'est pas fiable : en dessous de 5 annonces, on laisse vide (NA).
+iris <- iris |>
+  left_join(airbnb_iris, by = "code_iris") |>
+  mutate(prix_moyen = if_else(n_airbnb >= 5, prix_moyen, NA_real_))
 
-# 4. On met à jour la copie en WGS 84 pour la carte web
-arr_wgs <- st_transform(arr, 4326)
+# 6. Une copie en WGS 84 pour la carte web
+iris_wgs <- st_transform(iris, 4326)
 
-# 5. Les arrondissements où les annonces sont les plus denses
-arr |>
+# 7. Les IRIS où les annonces sont les plus chères
+iris |>
   st_drop_geometry() |>
-  select(l_aroff, n_airbnb, airbnb_par_km2) |>
-  arrange(desc(airbnb_par_km2)) |>
+  select(nom_com, nom_iris, n_airbnb, prix_moyen) |>
+  arrange(desc(prix_moyen)) |>
   head()
+
+# Deux précautions, valables pour toute moyenne calculée sur de petites unités :
+# - Les valeurs extrêmes : une seule annonce à 10 000 € suffit à faire grimper
+#   tout un IRIS, d'où le filtre de l'étape 3. La médiane (median(price))
+#   serait plus robuste.
+# - Les petits effectifs : avec moins de 5 annonces, la moyenne ne veut pas dire
+#   grand-chose ; ces IRIS restent en gris (NA).
 
 # ---- Exercice 4 — Assembler la carte -----------------------------------
 
 # 1. Une palette pour le deuxième indicateur (rose -> violet, "RdPu"),
-#    différente de celle du revenu pour ne pas confondre les deux couches
-pal_airbnb <- colorBin("RdPu", domain = arr_wgs$airbnb_par_km2,
-                       bins = classIntervals(arr_wgs$airbnb_par_km2, n = 5,
-                                             style = "fisher")$brks)
+#    différente de celle du revenu pour ne pas confondre les deux couches.
+#    na.color : couleur des IRIS sans prix moyen (moins de 5 annonces).
+pal_airbnb <- colorBin("RdPu", domain = iris_wgs$prix_moyen,
+                       bins = classIntervals(na.omit(iris_wgs$prix_moyen), n = 5,
+                                             style = "fisher")$brks,
+                       na.color = "#DDDDDD")
 
-# 2. Une seule étiquette pour les deux couches, avec les deux indicateurs :
-#    quelle que soit la couche affichée, on lit les deux valeurs au survol.
-etiq_arr <- sprintf(
-  "<strong>%s</strong><br/>Revenu médian : %s € / mois<br/>Annonces Airbnb : %s par km²",
-  arr_wgs$l_aroff,
-  format(arr_wgs$revenu_median, big.mark = " "),
-  format(arr_wgs$airbnb_par_km2, big.mark = " ")
-) |>
+# 2. Les étiquettes au survol : une pour les arrondissements, une pour les IRIS
+etiq_arr <- sprintf("<strong>%s</strong><br/>Revenu médian : %s € / mois",
+                    arr_wgs$l_aroff,
+                    format(arr_wgs$revenu_median, big.mark = " ")) |>
+  lapply(HTML)
+
+etiq_iris <- sprintf("<strong>%s</strong> (%s)<br/>Prix moyen : %s € / nuit<br/>%s annonces",
+                     iris_wgs$nom_iris, iris_wgs$nom_com,
+                     ifelse(is.na(iris_wgs$prix_moyen), "–", iris_wgs$prix_moyen),
+                     ifelse(is.na(iris_wgs$n_airbnb), 0, iris_wgs$n_airbnb)) |>
   lapply(HTML)
 
 # 3. Les options de mise en évidence, définies une fois et réutilisées
@@ -232,14 +268,14 @@ carte_paris <- leaflet() |>
             position = "bottomright", opacity = 0.8,
             labFormat = labelFormat(big.mark = " ", digits = 0)) |>
 
-  # --- Indicateur 2 : densité d'annonces Airbnb ---
-  addPolygons(data = arr_wgs, group = "Annonces Airbnb",
-              fillColor = ~pal_airbnb(airbnb_par_km2), fillOpacity = 0.75,
-              color = "white", weight = 1, label = etiq_arr,
+  # --- Indicateur 2 : prix moyen Airbnb par IRIS (contours plus fins) ---
+  addPolygons(data = iris_wgs, group = "Prix Airbnb (IRIS)",
+              fillColor = ~pal_airbnb(prix_moyen), fillOpacity = 0.75,
+              color = "white", weight = 0.3, label = etiq_iris,
               highlightOptions = surbrillance) |>
-  addLegend(data = arr_wgs, pal = pal_airbnb, values = ~airbnb_par_km2,
-            title = "Annonces Airbnb / km²", group = "Annonces Airbnb",
-            position = "bottomright", opacity = 0.8,
+  addLegend(data = iris_wgs, pal = pal_airbnb, values = ~prix_moyen,
+            title = "Prix moyen Airbnb (€ / nuit)", group = "Prix Airbnb (IRIS)",
+            position = "bottomright", opacity = 0.8, na.label = "< 5 annonces",
             labFormat = labelFormat(big.mark = " ", digits = 0)) |>
 
   # --- Couche de points : les stations Vélib' (gris foncé, au-dessus) ---
@@ -256,12 +292,12 @@ carte_paris <- leaflet() |>
   #     overlayGroups : cases à cocher, on superpose les couches de données
   addLayersControl(
     baseGroups    = c("OSM gris", "Plan IGN", "Photographies aériennes IGN"),
-    overlayGroups = c("Revenu médian", "Annonces Airbnb", "Stations Vélib'"),
+    overlayGroups = c("Revenu médian", "Prix Airbnb (IRIS)", "Stations Vélib'"),
     options = layersControlOptions(collapsed = FALSE)   # panneau toujours ouvert
   ) |>
 
   # --- Au départ, seul le revenu médian est affiché ---
-  hideGroup(c("Annonces Airbnb", "Stations Vélib'")) |>
+  hideGroup(c("Prix Airbnb (IRIS)", "Stations Vélib'")) |>
 
   # --- Barre d'échelle en bas à gauche ---
   addScaleBar(position = "bottomleft")
@@ -280,8 +316,11 @@ carte_paris
 
 # ---- À discuter --------------------------------------------------------------
 #
-# - Les annonces Airbnb sont-elles concentrées dans les arrondissements les
-#   plus aisés ? Qu'est-ce qui pourrait expliquer leur géographie ?
+# - Les annonces Airbnb les plus chères se trouvent-elles dans les
+#   arrondissements les plus aisés ? Qu'est-ce qui pourrait expliquer leur
+#   géographie (tourisme, monuments, taille des logements) ?
+# - Que voit-on à l'échelle de l'IRIS qui disparaîtrait à l'échelle de
+#   l'arrondissement ? En quoi est-ce une illustration du MAUP ?
 # - Les stations Vélib' sont-elles réparties de façon homogène ? Où sont les
 #   plus grandes stations ?
 # - Avec seulement 20 arrondissements, une carte interactive apporte-t-elle

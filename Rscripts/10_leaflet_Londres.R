@@ -171,7 +171,8 @@ carte_londres
 # Construisez une carte interactive de Paris avec les données de data/Paris/ :
 #   1. le revenu médian par arrondissement en choroplèthe interactive ;
 #   2. les stations Vélib' en cercles proportionnels à leur capacité ;
-#   3. le nombre d'annonces Airbnb par km² dans chaque arrondissement ;
+#   3. le prix moyen par nuit des annonces Airbnb dans chaque IRIS
+#      (Polygons/iris.shp, garder dep == 75) ;
 #   4. le tout avec plusieurs fonds de carte ouverts, un panneau de contrôle
 #      des couches et une échelle, puis enregistrez la carte en HTML.
 # Script de correction : 10b_cartes_interactives_Paris.R

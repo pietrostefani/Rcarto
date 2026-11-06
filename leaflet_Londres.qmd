@@ -275,6 +275,7 @@ Construisez une carte interactive de Paris avec les données du dossier `data/Pa
 | Fichier | Description |
 |----|----|
 | `Polygons/arrondiss_lambert.shp` | Les 20 arrondissements (Lambert 93) |
+| `Polygons/iris.shp` | Les IRIS d'Île-de-France (garder `dep == 75` pour Paris) |
 | `Tables/donnees_arrondissement_enrichi.csv` | Données socio-économiques par arrondissement |
 | `Points/velib-disponibilite-en-temps-reel.geojson` | Stations Vélib' (octobre 2022) |
 | `airbnb/listings.csv` | Annonces Airbnb (septembre 2022) |
@@ -283,7 +284,7 @@ Construisez une carte interactive de Paris avec les données du dossier `data/Pa
 
 1.  Joignez les données socio-économiques aux arrondissements (clé : `c_arinsee`) et cartographiez le **revenu médian** en choroplèthe interactive, avec une étiquette au survol et une légende.
 2.  Ajoutez les **stations Vélib'** de Paris en cercles proportionnels à leur capacité, avec un popup donnant le nom de la station et le nombre de vélos disponibles.
-3.  Calculez le **nombre d'annonces Airbnb par km²** dans chaque arrondissement (jointure spatiale) et ajoutez-le comme deuxième indicateur.
+3.  Calculez le **prix moyen par nuit des annonces Airbnb** dans chaque **IRIS** (jointure spatiale, puis `group_by()` et `summarise()`) et ajoutez-le comme deuxième indicateur. Attention aux prix aberrants et aux IRIS qui ne comptent que quelques annonces !
 4.  Assemblez le tout avec **trois fonds de carte ouverts** au choix, dont le Plan IGN, un panneau de contrôle des couches et une échelle, puis enregistrez la carte en HTML.
 
 **→ Corrigé : [Cartes interactives : Paris](cartes_interactives_Paris.qmd)**
